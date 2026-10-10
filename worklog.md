@@ -54,3 +54,31 @@ Stage Summary:
 - The "just paste a link" use case now works reliably for public tweets via the syndication API (the same mechanism X uses for embedded tweets).
 - Both modes still available: link mode (auto-fetches) and text mode (paste manually). Text mode remains the bulletproof fallback for private/deleted tweets.
 - UI structure unchanged per user request; only the backend fetcher + generate button logic were improved.
+
+---
+Task ID: 3
+Agent: main (Z.ai Code)
+Task: Make the UI bilingual (Persian + English with toggle), add Persian translation to each generated comment so the user understands what they're posting, and convert the app to a PWA installable on Android.
+
+Work Log:
+- Created src/lib/translations.ts with ~100 UI strings in both fa and en, plus a getTranslator helper.
+- Created src/components/language-provider.tsx — React context that persists language choice in localStorage and updates document.documentElement.lang + dir (rtl/ltr) on switch.
+- Created src/components/language-toggle.tsx — header button (Languages icon) that toggles FA/EN.
+- Updated src/lib/comment-generator.ts: added `persianTranslation` field to CommentSuggestion; updated the system prompt to require a faithful Persian translation of each English comment; updated parseResponse to extract it.
+- Rewrote src/components/comment-card.tsx: shows the English comment (LTR box) + a highlighted "ترجمه فارسی" section + reasoning; uses useLanguage() for all labels.
+- Rewrote src/app/page.tsx to use useLanguage()/t() for every string; options arrays (tones/lengths/angles/levels) are memoized per language; date locale switches fa-IR/en-US.
+- Updated src/app/layout.tsx: wrapped app in LanguageProvider; added PWA metadata (manifest link, apple-web-app meta, theme-color, icons); added Viewport export with themeColor + viewport-fit=cover for notch support.
+- Created public/manifest.json — standalone display, rtl+fa, icons (192/512 + maskable), app shortcuts.
+- Created scripts/icon.svg + icon-maskable.svg (speech bubble + X mark, accent dots) and scripts/generate-icons.ts (uses sharp, already installed) to generate icon-192.png, icon-512.png, maskable variants, apple-touch-icon.png, favicon-32.png into /public.
+- Verified with agent-browser:
+  - FA mode: UI in Persian (rtl), generated comments show English text + Persian translation + reasoning.
+  - EN mode: full UI switches to English (ltr), document dir/lang updated correctly.
+  - Language toggle persists via localStorage.
+  - PWA: manifest.json served (200), all icons served (200), manifest link + theme-color + apple meta in <head>.
+  - No console errors, no runtime errors, lint passes.
+
+Stage Summary:
+- App is now fully bilingual (FA/EN) with one-click toggle in the header; direction (RTL/LTR) switches automatically.
+- Every generated English comment now includes a faithful Persian translation so the user knows exactly what they're posting.
+- App is an installable PWA: Android users can "Add to Home Screen" and it launches as a standalone app with its own icon, no browser chrome, proper status bar.
+- Ready for deployment to user's own server/domain (instructions to be provided in chat).

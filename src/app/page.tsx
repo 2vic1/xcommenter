@@ -44,8 +44,11 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { LanguageToggle } from '@/components/language-toggle';
 import { CommentCard } from '@/components/comment-card';
+import { useLanguage } from '@/components/language-provider';
 import { toast } from '@/hooks/use-toast';
+import type { TranslationKey } from '@/lib/translations';
 import { cn } from '@/lib/utils';
 
 type Tone = 'friendly' | 'professional' | 'casual' | 'witty' | 'expert';
@@ -63,6 +66,7 @@ type EnglishLevel = 'simple' | 'intermediate' | 'advanced';
 
 interface CommentSuggestion {
   text: string;
+  persianTranslation: string;
   angleLabel: string;
   angleKey: string;
   reasoning: string;
@@ -92,41 +96,12 @@ interface RulesResponse {
   error?: string;
 }
 
-const TONES: { value: Tone; label: string; hint: string }[] = [
-  { value: 'friendly', label: 'صمیمی', hint: 'دوستانه و گرم' },
-  { value: 'professional', label: 'حرفه‌ای', hint: 'رسمی و جدی' },
-  { value: 'casual', label: 'عادی', hint: 'روزمره و ساده' },
-  { value: 'witty', label: 'باهوش', hint: 'شوخ‌طبع و هوشمندانه' },
-  { value: 'expert', label: 'متخصص', hint: 'دانش‌محور و دقیق' },
-];
-
-const LENGTHS: { value: CommentLength; label: string; hint: string }[] = [
-  { value: 'short', label: 'کوتاه', hint: '۱ تا ۱۵ کلمه' },
-  { value: 'medium', label: 'متوسط', hint: '۱۵ تا ۴۰ کلمه' },
-  { value: 'long', label: 'بلند', hint: '۴۰ تا ۸۰ کلمه' },
-];
-
-const ANGLES: { value: Angle; label: string }[] = [
-  { value: 'mixed', label: 'متنوع (پیشنهاد می‌شود)' },
-  { value: 'question', label: 'سوال کنجکاو' },
-  { value: 'agreement', label: 'موافقت + بینش' },
-  { value: 'insight', label: 'نکته ارزشمند' },
-  { value: 'experience', label: 'تجربه شخصی' },
-  { value: 'praise', label: 'تعریف خاص' },
-  { value: 'humor', label: 'طنز ملایم' },
-  { value: 'counterpoint', label: 'دیدگاه متفاوت' },
-];
-
-const LEVELS: { value: EnglishLevel; label: string; hint: string }[] = [
-  { value: 'simple', label: 'ساده', hint: 'B1 - کلمات رایج' },
-  { value: 'intermediate', label: 'متوسط', hint: 'B2 - محاوره‌ای' },
-  { value: 'advanced', label: 'پیشرفته', hint: 'C1 - واژگان غنی' },
-];
-
 const HISTORY_KEY = 'commentyar-history';
 const MAX_HISTORY = 20;
 
 export default function Home() {
+  const { t, lang, dir } = useLanguage();
+
   // Input state
   const [inputMode, setInputMode] = React.useState<'link' | 'text'>('text');
   const [tweetUrl, setTweetUrl] = React.useState('');
@@ -155,6 +130,50 @@ export default function Home() {
   const [rules, setRules] = React.useState<{ xRules: string; userPreferences: string } | null>(null);
   const [rulesLoading, setRulesLoading] = React.useState(true);
 
+  // Options arrays (memoized, depend on language)
+  const TONES = React.useMemo(
+    () => [
+      { value: 'friendly' as Tone, label: t('tone.friendly'), hint: t('tone.friendly.hint') },
+      { value: 'professional' as Tone, label: t('tone.professional'), hint: t('tone.professional.hint') },
+      { value: 'casual' as Tone, label: t('tone.casual'), hint: t('tone.casual.hint') },
+      { value: 'witty' as Tone, label: t('tone.witty'), hint: t('tone.witty.hint') },
+      { value: 'expert' as Tone, label: t('tone.expert'), hint: t('tone.expert.hint') },
+    ],
+    [t]
+  );
+
+  const LENGTHS = React.useMemo(
+    () => [
+      { value: 'short' as CommentLength, label: t('length.short'), hint: t('length.short.hint') },
+      { value: 'medium' as CommentLength, label: t('length.medium'), hint: t('length.medium.hint') },
+      { value: 'long' as CommentLength, label: t('length.long'), hint: t('length.long.hint') },
+    ],
+    [t]
+  );
+
+  const ANGLES = React.useMemo(
+    () => [
+      { value: 'mixed' as Angle, label: t('angle.mixed') },
+      { value: 'question' as Angle, label: t('angle.question') },
+      { value: 'agreement' as Angle, label: t('angle.agreement') },
+      { value: 'insight' as Angle, label: t('angle.insight') },
+      { value: 'experience' as Angle, label: t('angle.experience') },
+      { value: 'praise' as Angle, label: t('angle.praise') },
+      { value: 'humor' as Angle, label: t('angle.humor') },
+      { value: 'counterpoint' as Angle, label: t('angle.counterpoint') },
+    ],
+    [t]
+  );
+
+  const LEVELS = React.useMemo(
+    () => [
+      { value: 'simple' as EnglishLevel, label: t('level.simple'), hint: t('level.simple.hint') },
+      { value: 'intermediate' as EnglishLevel, label: t('level.intermediate'), hint: t('level.intermediate.hint') },
+      { value: 'advanced' as EnglishLevel, label: t('level.advanced'), hint: t('level.advanced.hint') },
+    ],
+    [t]
+  );
+
   // Load history and rules on mount
   React.useEffect(() => {
     try {
@@ -166,7 +185,6 @@ export default function Home() {
       // ignore
     }
 
-    // Load rules from API (cached on server after first load)
     fetch('/api/rules')
       .then((r) => r.json())
       .then((data: RulesResponse) => {
@@ -175,7 +193,7 @@ export default function Home() {
         }
       })
       .catch(() => {
-        // ignore - rules are optional for display
+        // ignore
       })
       .finally(() => setRulesLoading(false));
   }, []);
@@ -191,7 +209,7 @@ export default function Home() {
 
   const handleFetchTweet = async () => {
     if (!tweetUrl.trim()) {
-      toast({ title: 'لینک را وارد کنید', variant: 'destructive' });
+      toast({ title: t('toast.urlRequired'), variant: 'destructive' });
       return;
     }
     setFetching(true);
@@ -204,10 +222,10 @@ export default function Home() {
       });
       const data = await res.json();
       if (!data.success) {
-        setFetchError(data.error || 'دریافت توییت ناموفق بود.');
+        setFetchError(data.error || t('toast.fetchFailed'));
         toast({
-          title: 'دریافت توییت ناموفق',
-          description: 'می‌توانید متن توییت را مستقیماً وارد کنید.',
+          title: t('toast.fetchFailed'),
+          description: t('toast.fetchFailedDesc'),
           variant: 'destructive',
         });
         return;
@@ -215,28 +233,27 @@ export default function Home() {
       if (data.text && data.text.trim().length > 0) {
         setTweetContent(data.text);
         toast({
-          title: 'متن توییت دریافت شد',
-          description: data.author ? `نویسنده: @${data.author}` : undefined,
+          title: t('toast.fetched'),
+          description: data.author ? `@${data.author}` : undefined,
         });
       } else {
-        setFetchError(data.error || 'متن توییت خالی بود. لطفاً دستی وارد کنید.');
+        setFetchError(data.error || t('toast.fetchEmpty'));
         toast({
-          title: 'متن استخراج نشد',
-          description: 'لطفاً متن توییت را مستقیماً کپی و وارد کنید.',
+          title: t('toast.fetchEmpty'),
+          description: t('toast.fetchEmptyDesc'),
           variant: 'destructive',
         });
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'خطای شبکه';
+      const msg = err instanceof Error ? err.message : t('toast.networkError');
       setFetchError(msg);
-      toast({ title: 'خطای شبکه', description: msg, variant: 'destructive' });
+      toast({ title: t('toast.networkError'), description: msg, variant: 'destructive' });
     } finally {
       setFetching(false);
     }
   };
 
   const handleGenerate = async () => {
-    // If there is no tweet text but a link is provided, auto-fetch the link first.
     let effectiveContent = tweetContent.trim();
     if (!effectiveContent && tweetUrl.trim()) {
       setFetching(true);
@@ -252,28 +269,21 @@ export default function Home() {
           effectiveContent = fdata.text.trim();
           setTweetContent(effectiveContent);
           toast({
-            title: 'متن توییت از لینک دریافت شد',
-            description: fdata.author ? `نویسنده: @${fdata.author}` : undefined,
+            title: t('toast.fetchedFromLink'),
+            description: fdata.author ? `@${fdata.author}` : undefined,
           });
         } else {
           toast({
-            title: 'دریافت توییت ناموفق',
-            description:
-              'ایکس اجازه خواندن خودکار نداد. لطفاً متن توییت را مستقیم کپی کنید.',
+            title: t('toast.fetchBlocked'),
+            description: t('toast.fetchBlockedDesc'),
             variant: 'destructive',
           });
-          setFetchError(
-            fdata.error || 'متن توییت از لینک استخراج نشد.'
-          );
+          setFetchError(fdata.error || t('toast.fetchEmpty'));
           return;
         }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'خطای شبکه';
-        toast({
-          title: 'خطا در دریافت لینک',
-          description: msg,
-          variant: 'destructive',
-        });
+        const msg = err instanceof Error ? err.message : t('toast.networkError');
+        toast({ title: t('toast.networkError'), description: msg, variant: 'destructive' });
         return;
       } finally {
         setFetching(false);
@@ -282,8 +292,8 @@ export default function Home() {
 
     if (!effectiveContent) {
       toast({
-        title: 'متن یا لینک توییت خالی است',
-        description: 'یک لینک توییت وارد کنید یا متنش را مستقیم بنویسید.',
+        title: t('toast.contentRequired'),
+        description: t('toast.contentRequiredDesc'),
         variant: 'destructive',
       });
       return;
@@ -296,7 +306,7 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tweetContent,
+          tweetContent: effectiveContent,
           tone,
           length,
           angle,
@@ -308,8 +318,8 @@ export default function Home() {
       });
       const data = await res.json();
       if (!data.success) {
-        setGenError(data.error || 'تولید کامنت ناموفق بود.');
-        toast({ title: 'خطا در تولید', description: data.error, variant: 'destructive' });
+        setGenError(data.error || t('toast.genError'));
+        toast({ title: t('toast.genError'), description: data.error, variant: 'destructive' });
         return;
       }
       const generated: GenerateResult = {
@@ -318,10 +328,9 @@ export default function Home() {
       };
       setResult(generated);
 
-      // Save to history
       const entry: HistoryEntry = {
         id: `${Date.now()}`,
-        tweetText: tweetContent.slice(0, 300),
+        tweetText: effectiveContent.slice(0, 300),
         tweetSummary: generated.tweetSummary,
         comments: generated.comments,
         createdAt: Date.now(),
@@ -330,18 +339,17 @@ export default function Home() {
       persistHistory([entry, ...history].slice(0, MAX_HISTORY));
 
       toast({
-        title: `${generated.comments.length} کامنت پیشنهاد شد`,
-        description: 'هر کدام را که می‌پسندید کپی کنید.',
+        title: `${generated.comments.length} ${t('toast.generated')}`,
+        description: t('toast.generatedDesc'),
       });
 
-      // Scroll to results
       setTimeout(() => {
         document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'خطای شبکه';
+      const msg = err instanceof Error ? err.message : t('toast.networkError');
       setGenError(msg);
-      toast({ title: 'خطای شبکه', description: msg, variant: 'destructive' });
+      toast({ title: t('toast.networkError'), description: msg, variant: 'destructive' });
     } finally {
       setGenerating(false);
     }
@@ -349,7 +357,7 @@ export default function Home() {
 
   const handleClearHistory = () => {
     persistHistory([]);
-    toast({ title: 'تاریخچه پاک شد' });
+    toast({ title: t('toast.historyCleared') });
   };
 
   const handleRestoreFromHistory = (entry: HistoryEntry) => {
@@ -359,7 +367,7 @@ export default function Home() {
     setLength(entry.settings.length);
     setAngle(entry.settings.angle);
     setInputMode('text');
-    toast({ title: 'از تاریخچه بازیابی شد' });
+    toast({ title: t('toast.restored') });
     setTimeout(() => {
       document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
@@ -369,6 +377,8 @@ export default function Home() {
     (tweetContent.trim().length > 2 || tweetUrl.trim().length > 5) &&
     !generating &&
     !fetching;
+
+  const isRtl = dir === 'rtl';
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -380,9 +390,9 @@ export default function Home() {
               <MessageCircle className="h-5 w-5" />
             </div>
             <div className="leading-tight">
-              <h1 className="text-base font-bold sm:text-lg">کامنت‌یار ایکس</h1>
+              <h1 className="text-base font-bold sm:text-lg">{t('app.title')}</h1>
               <p className="hidden text-xs text-muted-foreground sm:block">
-                پیشنهاد کامنت انگلیسی هوشمند برای ایکس (توییتر)
+                {t('app.subtitle')}
               </p>
             </div>
           </div>
@@ -394,8 +404,9 @@ export default function Home() {
               onClick={() => document.getElementById('rules-section')?.scrollIntoView({ behavior: 'smooth' })}
             >
               <ShieldCheck className="h-4 w-4" />
-              قوانین
+              {t('app.rules')}
             </Button>
+            <LanguageToggle />
             <ThemeToggle />
           </div>
         </div>
@@ -406,14 +417,13 @@ export default function Home() {
         <section className="mb-8 text-center">
           <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border bg-muted/50 px-3 py-1 text-xs font-medium text-muted-foreground">
             <Sparkles className="h-3.5 w-3.5" />
-            قدرت‌گرفته با هوش مصنوعی
+            {t('hero.badge')}
           </div>
           <h2 className="mx-auto max-w-2xl text-2xl font-bold leading-tight sm:text-3xl">
-            کامنت انگلیسی مناسب و مرتبط برای پست‌های ایکس
+            {t('hero.title')}
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-            لینک توییت را بده یا متنش را کپی کن. هوش مصنوعی با توجه به قوانین ایکس و
-            سلیقه شما، چند کامنت انگلیسی جذاب پیشنهاد می‌دهد که تعامل را بالا می‌برد.
+            {t('hero.desc')}
           </p>
         </section>
 
@@ -425,11 +435,9 @@ export default function Home() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <FileText className="h-5 w-5 text-primary" />
-                  ورودی توییت
+                  {t('input.title')}
                 </CardTitle>
-                <CardDescription>
-                  متن توییت را مستقیم وارد کن یا لینک آن را بده تا خودکار خوانده شود.
-                </CardDescription>
+                <CardDescription>{t('input.desc')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Mode toggle */}
@@ -445,7 +453,7 @@ export default function Home() {
                     )}
                   >
                     <FileText className="h-4 w-4" />
-                    متن توییت
+                    {t('input.tabText')}
                   </button>
                   <button
                     type="button"
@@ -458,18 +466,18 @@ export default function Home() {
                     )}
                   >
                     <Link2 className="h-4 w-4" />
-                    لینک توییت
+                    {t('input.tabLink')}
                   </button>
                 </div>
 
                 {inputMode === 'link' ? (
                   <div className="space-y-2">
-                    <Label htmlFor="tweet-url">لینک پست ایکس</Label>
+                    <Label htmlFor="tweet-url">{t('input.urlLabel')}</Label>
                     <div className="flex flex-col gap-2 sm:flex-row">
                       <Input
                         id="tweet-url"
                         dir="ltr"
-                        placeholder="https://x.com/username/status/123..."
+                        placeholder={t('input.urlPlaceholder')}
                         value={tweetUrl}
                         onChange={(e) => setTweetUrl(e.target.value)}
                         className="ltr text-left"
@@ -482,12 +490,12 @@ export default function Home() {
                         {fetching ? (
                           <>
                             <Loader2 className="h-4 w-4 animate-spin" />
-                            دریافت...
+                            {t('input.fetching')}
                           </>
                         ) : (
                           <>
                             <RefreshCw className="h-4 w-4" />
-                            دریافت متن
+                            {t('input.fetch')}
                           </>
                         )}
                       </Button>
@@ -498,33 +506,29 @@ export default function Home() {
                         <span>{fetchError}</span>
                       </div>
                     )}
-                    <p className="text-xs text-muted-foreground">
-                      توجه: گاهی ایکس اجازه خواندن خودکار نمی‌دهد. اگر خطا داد، متن توییت را دستی کپی کن.
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t('input.urlHint')}</p>
                   </div>
                 ) : null}
 
-                {/* Tweet content textarea (always shown so user can edit) */}
+                {/* Tweet content textarea */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="tweet-content">متن توییت (انگلیسی)</Label>
+                    <Label htmlFor="tweet-content">{t('input.contentLabel')}</Label>
                     {tweetContent && (
                       <span className="text-xs text-muted-foreground">
-                        {tweetContent.length} کاراکتر
+                        {tweetContent.length} {t('input.chars')}
                       </span>
                     )}
                   </div>
                   <Textarea
                     id="tweet-content"
                     dir="ltr"
-                    placeholder="Paste the tweet text here... (متن توییت را اینجا پیست کنید)"
+                    placeholder="Paste the tweet text here..."
                     value={tweetContent}
                     onChange={(e) => setTweetContent(e.target.value)}
                     className="min-h-[140px] ltr text-left font-mono text-sm"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    می‌توانید این متن را ویرایش کنید تا پیشنهادها دقیق‌تر باشند.
-                  </p>
+                  <p className="text-xs text-muted-foreground">{t('input.editHint')}</p>
                 </div>
               </CardContent>
             </Card>
@@ -536,32 +540,30 @@ export default function Home() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Settings2 className="h-5 w-5 text-primary" />
-                  تنظیمات کامنت
+                  {t('settings.title')}
                 </CardTitle>
-                <CardDescription>سبک و لحن پیشنهادها را مشخص کن.</CardDescription>
+                <CardDescription>{t('settings.desc')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Tone */}
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">لحن</Label>
+                  <Label className="text-xs font-semibold">{t('settings.tone')}</Label>
                   <Select value={tone} onValueChange={(v) => setTone(v as Tone)}>
                     <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {TONES.map((t) => (
-                        <SelectItem key={t.value} value={t.value}>
-                          <span className="font-medium">{t.label}</span>
-                          <span className="text-muted-foreground"> — {t.hint}</span>
+                      {TONES.map((to) => (
+                        <SelectItem key={to.value} value={to.value}>
+                          <span className="font-medium">{to.label}</span>
+                          <span className="text-muted-foreground"> — {to.hint}</span>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
-                {/* Length */}
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">طول کامنت</Label>
+                  <Label className="text-xs font-semibold">{t('settings.length')}</Label>
                   <Select value={length} onValueChange={(v) => setLength(v as CommentLength)}>
                     <SelectTrigger className="w-full">
                       <SelectValue />
@@ -577,9 +579,8 @@ export default function Home() {
                   </Select>
                 </div>
 
-                {/* Angle */}
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">سبک کامنت</Label>
+                  <Label className="text-xs font-semibold">{t('settings.angle')}</Label>
                   <Select value={angle} onValueChange={(v) => setAngle(v as Angle)}>
                     <SelectTrigger className="w-full">
                       <SelectValue />
@@ -594,9 +595,8 @@ export default function Home() {
                   </Select>
                 </div>
 
-                {/* English level */}
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">سطح زبان انگلیسی</Label>
+                  <Label className="text-xs font-semibold">{t('settings.level')}</Label>
                   <Select value={englishLevel} onValueChange={(v) => setEnglishLevel(v as EnglishLevel)}>
                     <SelectTrigger className="w-full">
                       <SelectValue />
@@ -614,10 +614,9 @@ export default function Home() {
 
                 <Separator />
 
-                {/* Count */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-semibold">تعداد پیشنهاد</Label>
+                    <Label className="text-xs font-semibold">{t('settings.count')}</Label>
                     <Badge variant="secondary" className="tabular-nums">{count}</Badge>
                   </div>
                   <Slider
@@ -631,19 +630,18 @@ export default function Home() {
 
                 <Separator />
 
-                {/* Toggles */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between gap-3">
                     <div className="space-y-0.5">
-                      <Label htmlFor="emojis-switch" className="text-xs font-semibold">استفاده از ایموجی</Label>
-                      <p className="text-[11px] text-muted-foreground">۱-۲ ایموجی مرتبط اضافه شود</p>
+                      <Label htmlFor="emojis-switch" className="text-xs font-semibold">{t('settings.emojis')}</Label>
+                      <p className="text-[11px] text-muted-foreground">{t('settings.emojisHint')}</p>
                     </div>
                     <Switch id="emojis-switch" checked={emojis} onCheckedChange={setEmojis} />
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <div className="space-y-0.5">
-                      <Label htmlFor="question-switch" className="text-xs font-semibold">اولویت به سوال</Label>
-                      <p className="text-[11px] text-muted-foreground">کامنت‌هایی که سوال می‌پرسند ترجیح داده شوند</p>
+                      <Label htmlFor="question-switch" className="text-xs font-semibold">{t('settings.question')}</Label>
+                      <p className="text-[11px] text-muted-foreground">{t('settings.questionHint')}</p>
                     </div>
                     <Switch id="question-switch" checked={includeQuestion} onCheckedChange={setIncludeQuestion} />
                   </div>
@@ -664,17 +662,17 @@ export default function Home() {
             {fetching ? (
               <>
                 <Loader2 className="h-5 w-5 animate-spin" />
-                در حال دریافت توییت...
+                {t('generate.fetching')}
               </>
             ) : generating ? (
               <>
                 <Loader2 className="h-5 w-5 animate-spin" />
-                در حال تولید کامنت...
+                {t('generate.generating')}
               </>
             ) : (
               <>
                 <Wand2 className="h-5 w-5" />
-                تولید کامنت پیشنهادی
+                {t('generate.button')}
               </>
             )}
           </Button>
@@ -686,11 +684,11 @@ export default function Home() {
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                هوش مصنوعی در حال تحلیل توییت و تولید پیشنهادهاست...
+                {t('results.analyzing')}
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 {Array.from({ length: count }).map((_, i) => (
-                  <Skeleton key={i} className="h-44 w-full rounded-xl" />
+                  <Skeleton key={i} className="h-52 w-full rounded-xl" />
                 ))}
               </div>
             </div>
@@ -701,11 +699,11 @@ export default function Home() {
               <CardContent className="flex items-start gap-3 pt-6">
                 <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
                 <div>
-                  <p className="font-semibold text-destructive">خطا در تولید کامنت</p>
+                  <p className="font-semibold text-destructive">{t('toast.genErrorTitle')}</p>
                   <p className="text-sm text-muted-foreground">{genError}</p>
                   <Button variant="outline" size="sm" className="mt-3 gap-1.5" onClick={handleGenerate}>
                     <RefreshCw className="h-3.5 w-3.5" />
-                    تلاش دوباره
+                    {t('toast.retry')}
                   </Button>
                 </div>
               </CardContent>
@@ -714,13 +712,12 @@ export default function Home() {
 
           {!generating && !genError && result && (
             <div className="space-y-5">
-              {/* Summary */}
               {result.tweetSummary && (
                 <Card className="border-primary/20 bg-primary/5">
                   <CardContent className="flex items-start gap-3 pt-6">
                     <Lightbulb className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
                     <div>
-                      <p className="text-xs font-semibold text-muted-foreground">خلاصه توییت</p>
+                      <p className="text-xs font-semibold text-muted-foreground">{t('results.summary')}</p>
                       <p className="mt-1 text-sm leading-relaxed">{result.tweetSummary}</p>
                     </div>
                   </CardContent>
@@ -730,17 +727,15 @@ export default function Home() {
               <div className="flex items-center justify-between">
                 <h3 className="flex items-center gap-2 text-lg font-bold">
                   <ClipboardCheck className="h-5 w-5 text-primary" />
-                  {result.comments.length} کامنت پیشنهادی
+                  {result.comments.length} {t('results.count')}
                 </h3>
-                <span className="text-xs text-muted-foreground">
-                  برای کپی، دکمه «کپی» هر کارت را بزن
-                </span>
+                <span className="text-xs text-muted-foreground">{t('results.copyHint')}</span>
               </div>
 
               {result.comments.length === 0 ? (
                 <Card>
                   <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                    پیشنهادی دریافت نشد. لطفاً دوباره تلاش کن یا متن توییت را کامل‌تر کن.
+                    {t('results.empty')}
                   </CardContent>
                 </Card>
               ) : (
@@ -760,11 +755,11 @@ export default function Home() {
             <div className="mb-4 flex items-center justify-between">
               <h3 className="flex items-center gap-2 text-lg font-bold">
                 <History className="h-5 w-5 text-primary" />
-                تاریخچه ({history.length})
+                {t('history.title')} ({history.length})
               </h3>
               <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" onClick={handleClearHistory}>
                 <Trash2 className="h-3.5 w-3.5" />
-                پاک کردن
+                {t('history.clear')}
               </Button>
             </div>
             <ScrollArea className="max-h-96 scrollbar-thin rounded-xl border">
@@ -790,7 +785,7 @@ export default function Home() {
                           </span>
                         )}
                         <span className="text-[10px] text-muted-foreground">
-                          {new Date(entry.createdAt).toLocaleDateString('fa-IR', {
+                          {new Date(entry.createdAt).toLocaleDateString(lang === 'fa' ? 'fa-IR' : 'en-US', {
                             month: 'short',
                             day: 'numeric',
                             hour: '2-digit',
@@ -800,7 +795,7 @@ export default function Home() {
                       </div>
                     </div>
                     <Badge variant="outline" className="shrink-0 text-[10px]">
-                      {entry.comments.length} کامنت
+                      {entry.comments.length} {t('comment.words').replace('کلمه', '').trim() || '✓'}
                     </Badge>
                   </button>
                 ))}
@@ -815,12 +810,9 @@ export default function Home() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <ShieldCheck className="h-5 w-5 text-primary" />
-                قوانین ایکس و شیوه‌های تعامل
+                {t('rules.title')}
               </CardTitle>
-              <CardDescription>
-                این قوانین یک بار از فایل خوانده شده و در حافظه نگه داشته می‌شوند.
-                هوش مصنوعی همه پیشنهادها را مطابق این قوانین تولید می‌کند.
-              </CardDescription>
+              <CardDescription>{t('rules.desc')}</CardDescription>
             </CardHeader>
             <CardContent>
               {rulesLoading ? (
@@ -835,7 +827,7 @@ export default function Home() {
                     <AccordionTrigger className="text-sm font-semibold">
                       <span className="flex items-center gap-2">
                         <BookOpen className="h-4 w-4" />
-                        قوانین پلتفرم ایکس و شیوه‌های تعامل (فایل کامل)
+                        {t('rules.fullTitle')}
                       </span>
                     </AccordionTrigger>
                     <AccordionContent>
@@ -850,13 +842,13 @@ export default function Home() {
                     <AccordionTrigger className="text-sm font-semibold">
                       <span className="flex items-center gap-2">
                         <Settings2 className="h-4 w-4" />
-                        تنظیمات شخصی کاربر
+                        {t('rules.userPrefs')}
                       </span>
                     </AccordionTrigger>
                     <AccordionContent>
                       <ScrollArea className="max-h-80 scrollbar-thin rounded-md border bg-muted/30 p-4">
                         <pre className="whitespace-pre-wrap text-xs leading-relaxed">
-                          {rules.userPreferences || 'بدون تنظیمات شخصی.'}
+                          {rules.userPreferences || t('rules.noPrefs')}
                         </pre>
                       </ScrollArea>
                     </AccordionContent>
@@ -865,15 +857,12 @@ export default function Home() {
               ) : (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <AlertCircle className="h-4 w-4" />
-                  قوانین بارگذاری نشدند.
+                  {t('rules.loadFailed')}
                 </div>
               )}
               <div className="mt-4 flex items-center gap-2 rounded-md bg-emerald-50 p-3 text-xs text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
                 <CheckCircle2 className="h-4 w-4 shrink-0" />
-                <span>
-                  قوانین در اولین بارگذاری از فایل خوانده و در حافظه سرور کش می‌شوند.
-                  دسترسی همیشه سریع و بدون تأخیر است.
-                </span>
+                <span>{t('rules.cachedNote')}</span>
               </div>
             </CardContent>
           </Card>
@@ -888,13 +877,9 @@ export default function Home() {
               <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                 <MessageCircle className="h-3.5 w-3.5" />
               </div>
-              <span>
-                کامنت‌یار ایکس — ساخته‌شده برای افزایش تعامل واقعی
-              </span>
+              <span>{t('footer.tagline')}</span>
             </div>
-            <p className="text-xs text-muted-foreground">
-              قوانین ایکس رعایت می‌شود · هوش مصنوعی · همیشه در دسترس
-            </p>
+            <p className="text-xs text-muted-foreground">{t('footer.note')}</p>
           </div>
         </div>
       </footer>

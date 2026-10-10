@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1a1a"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- Speech bubble (message icon) -->
+  <path d="M 152 168 Q 152 140 180 140 L 332 140 Q 360 140 360 168 L 360 284 Q 360 312 332 312 L 232 312 L 188 356 Q 184 360 180 358 Q 176 356 176 350 L 176 312 L 180 312 Q 152 312 152 284 Z" fill="#ffffff"/>
+  <!-- X mark inside the bubble (represents X/Twitter) -->
+  <path d="M 232 196 L 280 256 M 280 196 L 232 256" stroke="#0a0a0a" stroke-width="18" stroke-linecap="round" fill="none"/>
+  <!-- Accent dots -->
+  <circle cx="196" cy="228" r="7" fill="#f59e0b"/>
+  <circle cx="316" cy="228" r="7" fill="#10b981"/>
+</svg>

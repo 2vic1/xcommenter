@@ -1,0 +1,48 @@
+{
+  "name": "کامنت‌یار ایکس | X Comment Companion",
+  "short_name": "کامنت‌یار",
+  "description": "پیشنهاد کامنت انگلیسی هوشمند برای پست‌های ایکس (توییتر) با هوش مصنوعی. Smart English comment suggestions for X (Twitter) posts.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#0a0a0a",
+  "lang": "fa",
+  "dir": "rtl",
+  "categories": ["productivity", "social", "utilities"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "تولید کامنت",
+      "short_name": "کامنت",
+      "description": "شروع سریع تولید کامنت",
+      "url": "/?action=generate"
+    }
+  ]
+}

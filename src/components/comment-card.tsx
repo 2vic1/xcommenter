@@ -1,11 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import { Copy, Check, MessageSquareText } from 'lucide-react';
+import { Copy, Check, MessageSquareText, Languages } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
+import { useLanguage } from '@/components/language-provider';
 import { cn } from '@/lib/utils';
 import type { CommentSuggestion } from '@/lib/comment-generator';
 
@@ -28,20 +29,21 @@ interface CommentCardProps {
 
 export function CommentCard({ comment, index }: CommentCardProps) {
   const [copied, setCopied] = React.useState(false);
+  const { t, lang } = useLanguage();
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(comment.text);
       setCopied(true);
       toast({
-        title: 'کامنت کپی شد!',
-        description: 'حالا در توییت پیست (Paste) کنید.',
+        title: t('toast.copied'),
+        description: t('toast.copiedDesc'),
       });
       setTimeout(() => setCopied(false), 2000);
     } catch {
       toast({
-        title: 'کپی ناموفق بود',
-        description: 'لطفاً متن را دستی انتخاب و کپی کنید.',
+        title: t('toast.copyFailed'),
+        description: t('toast.copyFailedDesc'),
         variant: 'destructive',
       });
     }
@@ -60,7 +62,7 @@ export function CommentCard({ comment, index }: CommentCardProps) {
               {comment.angleLabel}
             </Badge>
             <span className="text-xs text-muted-foreground">
-              {comment.wordCount} کلمه
+              {comment.wordCount} {t('comment.words')}
             </span>
           </div>
           <Button
@@ -72,25 +74,40 @@ export function CommentCard({ comment, index }: CommentCardProps) {
             {copied ? (
               <>
                 <Check className="h-3.5 w-3.5" />
-                کپی شد
+                {t('comment.copied')}
               </>
             ) : (
               <>
                 <Copy className="h-3.5 w-3.5" />
-                کپی
+                {t('comment.copy')}
               </>
             )}
           </Button>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
+        {/* English comment */}
         <div className="ltr flex items-start gap-2 rounded-md bg-muted/50 p-3 text-[15px] leading-relaxed">
           <MessageSquareText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
           <p className="font-medium">{comment.text}</p>
         </div>
+
+        {/* Persian translation so the user understands what it means */}
+        {comment.persianTranslation && (
+          <div className="flex items-start gap-2 rounded-md border border-primary/20 bg-primary/5 p-2.5 text-sm leading-relaxed">
+            <Languages className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+            <div>
+              <span className="ml-1 text-[11px] font-semibold text-primary">
+                {t('comment.translation')}:
+              </span>
+              <span className="text-foreground">{comment.persianTranslation}</span>
+            </div>
+          </div>
+        )}
+
         {comment.reasoning && (
           <p className="text-sm leading-relaxed text-muted-foreground">
-            <span className="font-semibold text-foreground">چرا کار می‌کند: </span>
+            <span className="font-semibold text-foreground">{t('comment.why')} </span>
             {comment.reasoning}
           </p>
         )}

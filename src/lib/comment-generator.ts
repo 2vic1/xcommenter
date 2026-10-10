@@ -31,6 +31,7 @@ export interface CommentOptions {
 
 export interface CommentSuggestion {
   text: string;
+  persianTranslation: string; // Persian translation so the user knows what it means
   angleLabel: string; // Persian label for display
   angleKey: string;
   reasoning: string; // Persian explanation of why this works
@@ -162,6 +163,7 @@ ${userPreferences}
     {
       "angleKey": "question|agreement|insight|experience|praise|humor|counterpoint|expansion|resource",
       "text": "the English comment text",
+      "persianTranslation": "ترجمه فارسی دقیق و روان همان کامنت، تا کاربر بداند چه می‌گوید",
       "reasoning": "توضیح فارسی کوتاه که چرا این کامنت تعامل خوبی می‌گیرد"
     }
   ]
@@ -173,8 +175,9 @@ ${userPreferences}
 7. Do NOT include @mentions of the author. Do NOT add hashtags unless highly relevant.
 8. If emojis are allowed, use at most 1-2 per comment, placed naturally.
 9. Keep comments within the requested length range.
-10. The "reasoning" must be in PERSIAN and explain the engagement logic.
-11. The "tweetSummary" must be in PERSIAN.
+10. The "persianTranslation" MUST be a faithful, natural Persian translation of the English "text" — same meaning, same tone. This is critical: the user's English is weak and needs to understand exactly what they are posting.
+11. The "reasoning" must be in PERSIAN and explain the engagement logic.
+12. The "tweetSummary" must be in PERSIAN.
 
 Remember: quality over quantity. Each comment should feel human, genuine, and conversational.`;
 }
@@ -211,6 +214,7 @@ function parseResponse(raw: string, expectedCount: number): GenerateResult {
     comments?: Array<{
       angleKey?: string;
       text?: string;
+      persianTranslation?: string;
       reasoning?: string;
     }>;
   };
@@ -234,6 +238,7 @@ function parseResponse(raw: string, expectedCount: number): GenerateResult {
       const text = c.text!.trim();
       return {
         text,
+        persianTranslation: (c.persianTranslation || '').trim(),
         angleKey,
         angleLabel:
           ANGLE_LABELS_PERSIAN[angleKey] ||

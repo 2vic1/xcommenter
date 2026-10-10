@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1a1a"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </linearGradient>
+  </defs>
+  <!-- Full bleed background (maskable) -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <!-- Speech bubble centered in safe zone (40% center) -->
+  <path d="M 172 188 Q 172 160 200 160 L 312 160 Q 340 160 340 188 L 340 276 Q 340 304 312 304 L 240 304 L 208 336 Q 204 340 200 338 Q 196 336 196 330 L 196 304 L 200 304 Q 172 304 172 276 Z" fill="#ffffff"/>
+  <!-- X mark -->
+  <path d="M 236 204 L 276 252 M 276 204 L 236 252" stroke="#0a0a0a" stroke-width="16" stroke-linecap="round" fill="none"/>
+  <!-- Accent dots -->
+  <circle cx="208" cy="232" r="6" fill="#f59e0b"/>
+  <circle cx="304" cy="232" r="6" fill="#10b981"/>
+</svg>
