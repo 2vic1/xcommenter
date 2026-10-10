@@ -18,6 +18,8 @@ import {
   RefreshCw,
   Lightbulb,
   MessageCircle,
+  Download,
+  ImageIcon,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -76,6 +78,9 @@ interface CommentSuggestion {
 interface GenerateResult {
   comments: CommentSuggestion[];
   tweetSummary: string;
+  imagePrompt?: string;
+  imageDataUrl?: string;
+  imageError?: string;
 }
 
 interface HistoryEntry {
@@ -114,9 +119,16 @@ export default function Home() {
   const [length, setLength] = React.useState<CommentLength>('medium');
   const [angle, setAngle] = React.useState<Angle>('mixed');
   const [englishLevel, setEnglishLevel] = React.useState<EnglishLevel>('simple');
-  const [emojis, setEmojis] = React.useState(true);
+  const [emojiCount, setEmojiCount] = React.useState(1);
+  const [emojiStyle, setEmojiStyle] = React.useState<'variety' | 'consistent'>('variety');
   const [includeQuestion, setIncludeQuestion] = React.useState(false);
   const [count, setCount] = React.useState(5);
+  const [generateImageEnabled, setGenerateImageEnabled] = React.useState(false);
+
+  // API key settings
+  const [apiSource, setApiSource] = React.useState<'site' | 'personal'>('site');
+  const [apiKeyInput, setApiKeyInput] = React.useState('');
+  const [savedApiKey, setSavedApiKey] = React.useState('');
 
   // Generation state
   const [generating, setGenerating] = React.useState(false);
@@ -174,12 +186,18 @@ export default function Home() {
     [t]
   );
 
-  // Load history and rules on mount
+  // Load history, rules, and saved API key on mount
   React.useEffect(() => {
     try {
       const stored = localStorage.getItem(HISTORY_KEY);
       if (stored) {
         setHistory(JSON.parse(stored));
+      }
+      const savedKey = localStorage.getItem('commentyar-api-key');
+      if (savedKey && savedKey.trim().length > 0) {
+        setSavedApiKey(savedKey.trim());
+        setApiSource('personal');
+        setApiKeyInput(savedKey.trim());
       }
     } catch {
       // ignore
@@ -197,6 +215,36 @@ export default function Home() {
       })
       .finally(() => setRulesLoading(false));
   }, []);
+
+  const handleSaveApiKey = () => {
+    const trimmed = apiKeyInput.trim();
+    if (!trimmed) {
+      toast({ title: t('toast.urlRequired'), description: t('settings.apiKeyPlaceholder'), variant: 'destructive' });
+      return;
+    }
+    try {
+      localStorage.setItem('commentyar-api-key', trimmed);
+      setSavedApiKey(trimmed);
+      setApiSource('personal');
+      toast({ title: t('settings.apiKeySaved') });
+    } catch {
+      toast({ title: t('toast.networkError'), variant: 'destructive' });
+    }
+  };
+
+  const handleClearApiKey = () => {
+    try {
+      localStorage.removeItem('commentyar-api-key');
+    } catch {
+      // ignore
+    }
+    setSavedApiKey('');
+    setApiKeyInput('');
+    setApiSource('site');
+    toast({ title: t('settings.apiKeyCleared') });
+  };
+
+  const effectiveApiKey = apiSource === 'personal' && savedApiKey ? savedApiKey : undefined;
 
   const persistHistory = React.useCallback((entries: HistoryEntry[]) => {
     setHistory(entries);
@@ -310,10 +358,13 @@ export default function Home() {
           tone,
           length,
           angle,
-          emojis,
+          emojiCount,
+          emojiStyle,
           includeQuestion,
           englishLevel,
           count,
+          generateImage: generateImageEnabled,
+          apiKey: effectiveApiKey,
         }),
       });
       const data = await res.json();
@@ -325,6 +376,9 @@ export default function Home() {
       const generated: GenerateResult = {
         comments: data.comments || [],
         tweetSummary: data.tweetSummary || '',
+        imagePrompt: data.imagePrompt,
+        imageDataUrl: data.imageDataUrl,
+        imageError: data.imageError,
       };
       setResult(generated);
 
@@ -630,14 +684,46 @@ export default function Home() {
 
                 <Separator />
 
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="emojis-switch" className="text-xs font-semibold">{t('settings.emojis')}</Label>
-                      <p className="text-[11px] text-muted-foreground">{t('settings.emojisHint')}</p>
-                    </div>
-                    <Switch id="emojis-switch" checked={emojis} onCheckedChange={setEmojis} />
+                {/* Emoji count slider */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold">{t('settings.emojiCount')}</Label>
+                    <Badge variant="secondary" className="tabular-nums">{emojiCount}</Badge>
                   </div>
+                  <Slider
+                    value={[emojiCount]}
+                    onValueChange={(v) => setEmojiCount(v[0])}
+                    min={0}
+                    max={3}
+                    step={1}
+                  />
+                </div>
+
+                {/* Emoji style (only relevant if count > 0) */}
+                {emojiCount > 0 && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">{t('settings.emojiStyle')}</Label>
+                    <Select value={emojiStyle} onValueChange={(v) => setEmojiStyle(v as 'variety' | 'consistent')}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="variety">
+                          <span className="font-medium">{t('settings.emojiStyle.variety')}</span>
+                          <span className="text-muted-foreground"> — {t('settings.emojiStyle.varietyHint')}</span>
+                        </SelectItem>
+                        <SelectItem value="consistent">
+                          <span className="font-medium">{t('settings.emojiStyle.consistent')}</span>
+                          <span className="text-muted-foreground"> — {t('settings.emojiStyle.consistentHint')}</span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                <Separator />
+
+                <div className="space-y-3">
                   <div className="flex items-center justify-between gap-3">
                     <div className="space-y-0.5">
                       <Label htmlFor="question-switch" className="text-xs font-semibold">{t('settings.question')}</Label>
@@ -645,6 +731,67 @@ export default function Home() {
                     </div>
                     <Switch id="question-switch" checked={includeQuestion} onCheckedChange={setIncludeQuestion} />
                   </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="image-switch" className="text-xs font-semibold">{t('settings.image')}</Label>
+                      <p className="text-[11px] text-muted-foreground">{t('settings.imageHint')}</p>
+                    </div>
+                    <Switch id="image-switch" checked={generateImageEnabled} onCheckedChange={setGenerateImageEnabled} />
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* API key settings */}
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">{t('settings.apiSource')}</Label>
+                    <Select value={apiSource} onValueChange={(v) => setApiSource(v as 'site' | 'personal')}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="site">
+                          <span className="font-medium">{t('settings.apiSource.site')}</span>
+                          <span className="text-muted-foreground"> — {t('settings.apiSource.siteHint')}</span>
+                        </SelectItem>
+                        <SelectItem value="personal">
+                          <span className="font-medium">{t('settings.apiSource.personal')}</span>
+                          <span className="text-muted-foreground"> — {t('settings.apiSource.personalHint')}</span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {apiSource === 'personal' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="api-key-input" className="text-xs font-semibold">{t('settings.apiKeyLabel')}</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="api-key-input"
+                          type="password"
+                          dir="ltr"
+                          placeholder={t('settings.apiKeyPlaceholder')}
+                          value={apiKeyInput}
+                          onChange={(e) => setApiKeyInput(e.target.value)}
+                          className="ltr text-left font-mono text-xs"
+                        />
+                        <Button size="sm" variant="default" className="shrink-0" onClick={handleSaveApiKey}>
+                          {t('settings.apiKeySave')}
+                        </Button>
+                        {savedApiKey && (
+                          <Button size="sm" variant="outline" className="shrink-0" onClick={handleClearApiKey}>
+                            {t('settings.apiKeyClear')}
+                          </Button>
+                        )}
+                      </div>
+                      <p className="text-[11px] leading-relaxed text-muted-foreground">{t('settings.apiKeyDesc')}</p>
+                      {savedApiKey && (
+                        <p className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                          ✓ {t('settings.apiKeySaved')}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -720,6 +867,46 @@ export default function Home() {
                       <p className="text-xs font-semibold text-muted-foreground">{t('results.summary')}</p>
                       <p className="mt-1 text-sm leading-relaxed">{result.tweetSummary}</p>
                     </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Generated image */}
+              {generateImageEnabled && (
+                <Card className="overflow-hidden">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      {t('results.image')}
+                    </CardTitle>
+                    <CardDescription className="text-xs">{t('results.imageHint')}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {result.imageDataUrl ? (
+                      <div className="space-y-3">
+                        <div className="overflow-hidden rounded-lg border">
+                          <img
+                            src={result.imageDataUrl}
+                            alt={t('results.image')}
+                            className="mx-auto max-h-80 w-auto object-contain"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <a
+                            href={result.imageDataUrl}
+                            download={`comment-image-${Date.now()}.png`}
+                            className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors hover:bg-muted"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            {t('comment.copy')}
+                          </a>
+                        </div>
+                      </div>
+                    ) : result.imageError ? (
+                      <p className="text-sm text-destructive">{t('results.imageError')}: {result.imageError}</p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">{t('results.imageError')}</p>
+                    )}
                   </CardContent>
                 </Card>
               )}

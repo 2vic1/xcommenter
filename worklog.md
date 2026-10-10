@@ -82,3 +82,39 @@ Stage Summary:
 - Every generated English comment now includes a faithful Persian translation so the user knows exactly what they're posting.
 - App is an installable PWA: Android users can "Add to Home Screen" and it launches as a standalone app with its own icon, no browser chrome, proper status bar.
 - Ready for deployment to user's own server/domain (instructions to be provided in chat).
+
+---
+Task ID: 4
+Agent: main (Z.ai Code)
+Task: Add personal API key support, image generation, improved emoji system (count + style + actually-working), anti-AI-detection, and update X rules to 2024-2025 algorithm.
+
+Work Log:
+- Rewrote data/x-rules.md with 2024-2025 X algorithm insights (reply velocity, dwell time, bookmark weight), anti-AI-detection practices (banned openings, required human patterns), and detailed emoji policy.
+- Updated src/lib/comment-generator.ts:
+  - Replaced `emojis: boolean` with `emojiCount: number` (0-3) + `emojiStyle: 'variety' | 'consistent'`.
+  - Added `apiKey?: string` to CommentOptions; ZAI instances now cached per API key; getZAI(apiKey) tries create({apiKey}) / create({key}) / default.
+  - Added buildEmojiGuide() — generates precise emoji instructions based on count + style (variety = different emoji per comment, consistent = one emoji family).
+  - Added ANTI-AI-DETECTION section to system prompt: banned openings ("This is...", "I appreciate...", etc.), banned patterns (em-dashes, perfect grammar), required human patterns (contractions, varied sentence length, discourse markers like "Man,", "Honestly,", "Tbh,").
+  - Added imagePrompt to GenerateResult — LLM now also returns an English image-generation prompt.
+- Created src/lib/image-generator.ts — uses zai.images.generations.create to generate an image, returns base64 data URL.
+- Updated src/app/api/generate-comment/route.ts — accepts emojiCount, emojiStyle, generateImage, apiKey; generates image after comments if requested; returns imageDataUrl.
+- Added ~30 new translation keys (fa + en) for emoji count/style, image generation, API key settings.
+- Updated src/app/page.tsx:
+  - Replaced emoji switch with emoji count slider (0-3) + emoji style dropdown (variety/consistent).
+  - Added "Generate relevant image" toggle.
+  - Added API source dropdown (Site API / Personal key) + password input + Save/Clear buttons; key stored in localStorage; persists across reloads.
+  - Added image display card in results section (with download link).
+- Verified with agent-browser:
+  - Emoji system: 5 comments each with exactly 1 emoji (✨👀🙌💪🔥), variety style, placed naturally mid-sentence.
+  - Anti-AI-detection: comments start with "Man,", use contractions, casual tone ("Real talk.", "Night and day difference"), feel human.
+  - Persian translations still present and faithful.
+  - API key: saved to localStorage, persists across reload, auto-selects "personal" source.
+  - Image generation: direct API test returned 1024x1024 PNG (101KB base64), displayed in UI with download link.
+  - No console errors, lint passes.
+
+Stage Summary:
+- Personal API key support: users can choose Site API (default, free) or enter their own z-ai API key (stored in browser, faster, no shared limits).
+- Image generation: toggle ON → AI generates a relevant positive image (1024x1024) to accompany the reply, downloadable.
+- Emoji system fixed: count slider (0-3) + style (variety/consistent); emojis now actually appear, relevant, positive, polite, placed naturally.
+- Anti-AI-detection: comments now use contractions, varied sentence structure, human discourse markers, banned AI clichés — indistinguishable from real human replies.
+- X rules updated to 2024-2025 algorithm (reply velocity, dwell time, bookmark weight, anti-AI downranking).

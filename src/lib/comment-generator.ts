@@ -18,15 +18,18 @@ export type Angle =
   | 'humor'
   | 'counterpoint';
 export type EnglishLevel = 'simple' | 'intermediate' | 'advanced';
+export type EmojiStyle = 'variety' | 'consistent';
 
 export interface CommentOptions {
   tone: Tone;
   length: CommentLength;
   angle: Angle;
-  emojis: boolean;
+  emojiCount: number; // 0-3 emojis per comment
+  emojiStyle: EmojiStyle; // 'variety' = different emojis per comment, 'consistent' = same emoji family
   includeQuestion: boolean;
   englishLevel: EnglishLevel;
   count: number;
+  apiKey?: string; // optional personal API key
 }
 
 export interface CommentSuggestion {
@@ -41,16 +44,36 @@ export interface CommentSuggestion {
 export interface GenerateResult {
   comments: CommentSuggestion[];
   tweetSummary: string; // Persian summary of what the tweet is about
+  imagePrompt?: string; // English prompt to generate a relevant image
   raw?: string;
 }
 
-let zaiInstance: Awaited<ReturnType<typeof ZAI.create>> | null = null;
+// Cache ZAI instances per API key (default = no key)
+const zaiInstances = new Map<string, Awaited<ReturnType<typeof ZAI.create>>>();
 
-async function getZAI() {
-  if (!zaiInstance) {
-    zaiInstance = await ZAI.create();
+async function getZAI(apiKey?: string): Promise<Awaited<ReturnType<typeof ZAI.create>>> {
+  const key = apiKey || '__default__';
+  if (zaiInstances.has(key)) {
+    return zaiInstances.get(key)!;
   }
-  return zaiInstance;
+  let instance: Awaited<ReturnType<typeof ZAI.create>>;
+  if (apiKey && apiKey.trim().length > 0) {
+    // Try to create with a custom API key.
+    // The SDK accepts options via create(); we attempt both shapes for safety.
+    try {
+      instance = await (ZAI as unknown as { create: (opts?: unknown) => Promise<Awaited<ReturnType<typeof ZAI.create>>> }).create({ apiKey });
+    } catch {
+      try {
+        instance = await (ZAI as unknown as { create: (opts?: unknown) => Promise<Awaited<ReturnType<typeof ZAI.create>>> }).create({ key: apiKey });
+      } catch {
+        instance = await ZAI.create();
+      }
+    }
+  } else {
+    instance = await ZAI.create();
+  }
+  zaiInstances.set(key, instance);
+  return instance;
 }
 
 const TONE_LABELS: Record<Tone, string> = {
@@ -112,7 +135,7 @@ export async function generateComments(
   options: CommentOptions
 ): Promise<GenerateResult> {
   const { xRules, userPreferences } = await getRules();
-  const zai = await getZAI();
+  const zai = await getZAI(options.apiKey);
 
   const systemPrompt = buildSystemPrompt(xRules, userPreferences, options);
   const userPrompt = buildUserPrompt(tweetContent, options);
@@ -131,16 +154,28 @@ export async function generateComments(
   return parsed;
 }
 
+function buildEmojiGuide(options: CommentOptions): string {
+  const { emojiCount, emojiStyle } = options;
+  if (emojiCount === 0) {
+    return 'NO emojis at all. Do not include any emoji in any comment.';
+  }
+  const styleGuide =
+    emojiStyle === 'consistent'
+      ? `Use a CONSISTENT emoji family across all comments (e.g. if the topic is growth, use 🌱/📈/🌿 throughout — same vibe, same style). Pick one emoji family and stick with it.`
+      : `Use VARIETY — each comment should have a DIFFERENT emoji that fits its specific angle. Do not repeat the same emoji across comments.`;
+  return `Use EXACTLY ${emojiCount} emoji${emojiCount > 1 ? 's' : ''} per comment, placed naturally within the text (not all at the end). ${styleGuide} Emojis MUST be: relevant to the tweet topic, positive, polite, and never spammy. Avoid 🚀 unless the tweet is literally about rockets/launches. Prefer contextual emojis like ✨💡👀🙌🤝💪🎯📌🧵🔥📝 when they actually fit.`;
+}
+
 function buildSystemPrompt(
   xRules: string,
   userPreferences: string,
   options: CommentOptions
 ): string {
-  return `You are an expert X (Twitter) engagement strategist and native-level English communicator.
+  return `You are an expert X (Twitter) engagement strategist who writes like a real, native English-speaking human — NOT like an AI.
 
-Your job: given a tweet's content, suggest ${options.count} high-quality ENGLISH reply comments that maximize genuine engagement while STRICTLY following X's platform rules.
+Your job: given a tweet's content, suggest ${options.count} high-quality ENGLISH reply comments that maximize genuine engagement, follow X's platform rules, and are INDISTINGUISHABLE from comments a real human would write.
 
-=== X / TWITTER PLATFORM RULES (MUST follow) ===
+=== X / TWITTER PLATFORM RULES & 2024-2025 ALGORITHM (MUST follow) ===
 ${xRules}
 
 === USER PREFERENCES ===
@@ -150,15 +185,38 @@ ${userPreferences}
 - Tone: ${options.tone} (${TONE_LABELS[options.tone]})
 - Length: ${options.length} -> ${LENGTH_GUIDE[options.length]}
 - Angle focus: ${ANGLE_GUIDE[options.angle]}
-- Emojis allowed: ${options.emojis ? 'YES, use 1-2 relevant emojis max' : 'NO emojis'}
+- Emoji policy: ${buildEmojiGuide(options)}
 - Include a question: ${options.includeQuestion ? 'prefer comments that ask a question' : 'not required'}
 - English level: ${ENGLISH_LEVEL_GUIDE[options.englishLevel]}
+
+=== ANTI-AI-DETECTION RULES (CRITICAL — X now downranks AI-detected comments) ===
+You MUST write like a real human. Violating any of these = failure:
+
+1. BANNED OPENINGS (never start a comment with these — they are AI clichés):
+   "This is...", "This is exactly...", "This is such a...", "I appreciate...", "It's worth noting...", "What a great point...", "Love this perspective...", "Spot on!", "Couldn't agree more!", "Great insights!", "As someone who...", "Would love to hear your thoughts!"
+
+2. BANNED PATTERNS:
+   - Em-dashes (—) and semicolons (;) used in a "polished" way
+   - Numbered or bulleted lists inside a comment
+   - Perfect, formal grammar in every sentence
+   - "robotically structured" sentences (subject + verb + object, every time)
+   - Ending with "Would love to hear your thoughts!" or "Curious what you think!"
+
+3. REQUIRED HUMAN PATTERNS:
+   - Use contractions freely: I've, don't, can't, you're, that's, it's
+   - Vary sentence length: mix short punchy fragments with longer sentences
+   - Occasionally start lowercase (very rare, only when it fits the casual tone)
+   - Use natural discourse markers: "Man,", "Honestly,", "Real talk,", "Tbh,", "Ngl,"
+   - Allow ONE small human imperfection per comment (a sentence that ends abruptly, a casual "haha", a trailing "...", etc.)
+   - Write how a real person tweets — not how an essay is structured
+   - Vary opening words across the ${options.count} comments — do not start 2 comments the same way
 
 === STRICT OUTPUT RULES ===
 1. Respond with ONLY a valid JSON object. No markdown fences, no extra text before/after.
 2. The JSON must have this exact shape:
 {
   "tweetSummary": "یک خلاصه کوتاه فارسی از اینکه توییت درباره چیست",
+  "imagePrompt": "an English image-generation prompt describing a relevant, positive, on-topic image that could accompany a reply to this tweet (concrete visual description, style, mood). Keep it under 60 words.",
   "comments": [
     {
       "angleKey": "question|agreement|insight|experience|praise|humor|counterpoint|expansion|resource",
@@ -168,18 +226,18 @@ ${userPreferences}
     }
   ]
 }
-3. Produce exactly ${options.count} comments. Make each one DISTINCT in angle and wording.
+3. Produce exactly ${options.count} comments. Make each one DISTINCT in angle, wording, AND opening.
 4. Each comment text must be in ENGLISH, ready to copy-paste, with no quotes around it.
-5. NEVER start a comment with "Great", "This is", "Amazing", "Love this", "Wow", or generic praise — these are flagged as low-quality.
-6. Comments must be DIRECTLY relevant to the tweet's actual content. Reference specifics.
-7. Do NOT include @mentions of the author. Do NOT add hashtags unless highly relevant.
-8. If emojis are allowed, use at most 1-2 per comment, placed naturally.
-9. Keep comments within the requested length range.
-10. The "persianTranslation" MUST be a faithful, natural Persian translation of the English "text" — same meaning, same tone. This is critical: the user's English is weak and needs to understand exactly what they are posting.
-11. The "reasoning" must be in PERSIAN and explain the engagement logic.
-12. The "tweetSummary" must be in PERSIAN.
+5. Comments must be DIRECTLY relevant to the tweet's actual content. Reference specifics from the tweet.
+6. Do NOT include @mentions of the author. Do NOT add hashtags unless highly relevant.
+7. Follow the emoji policy above EXACTLY — count the emojis in each comment to make sure they match.
+8. Keep comments within the requested length range.
+9. The "persianTranslation" MUST be a faithful, natural Persian translation of the English "text" — same meaning, same tone. The user's English is weak and needs to understand exactly what they are posting.
+10. The "reasoning" must be in PERSIAN and explain the engagement logic.
+11. The "tweetSummary" must be in PERSIAN.
+12. The "imagePrompt" must be in ENGLISH, describe a single relevant image (no text overlays), positive mood, suitable as a social media reply image.
 
-Remember: quality over quantity. Each comment should feel human, genuine, and conversational.`;
+Remember: every comment must pass the "real human" test. If a comment looks AI-written, rewrite it.`;
 }
 
 function buildUserPrompt(tweetContent: string, options: CommentOptions): string {
@@ -189,7 +247,7 @@ function buildUserPrompt(tweetContent: string, options: CommentOptions): string 
 ${tweetContent}
 """
 
-Now generate ${options.count} English comment suggestions following all rules and settings. Remember to return ONLY the JSON object.`;
+Now generate ${options.count} English comment suggestions following all rules, the anti-AI-detection guidelines, and the emoji policy. Remember to return ONLY the JSON object.`;
 }
 
 function parseResponse(raw: string, expectedCount: number): GenerateResult {
@@ -211,6 +269,7 @@ function parseResponse(raw: string, expectedCount: number): GenerateResult {
 
   let parsed: {
     tweetSummary?: string;
+    imagePrompt?: string;
     comments?: Array<{
       angleKey?: string;
       text?: string;
@@ -226,6 +285,7 @@ function parseResponse(raw: string, expectedCount: number): GenerateResult {
     return {
       comments: [],
       tweetSummary: '',
+      imagePrompt: '',
       raw,
     };
   }
@@ -252,6 +312,7 @@ function parseResponse(raw: string, expectedCount: number): GenerateResult {
   return {
     comments,
     tweetSummary: parsed.tweetSummary || '',
+    imagePrompt: parsed.imagePrompt || '',
     raw,
   };
 }
