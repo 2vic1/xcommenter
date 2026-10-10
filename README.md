@@ -184,17 +184,14 @@ Pull Request و Issue welcome!
 
 | شبکه | آدرس |
 |------|------|
-| **Bitcoin (BTC)** | `bc1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
-| **Ethereum (ETH) / USDT (ERC20)** | `0x........................................` |
-| **Tron (TRX) / USDT (TRC20)** | `T................................` |
-| **Solana (SOL)** | `................................` |
-| **TON** | `UQ................................` |
+| **Bitcoin (BTC)** | `bc1pj3dmcgpzf9d6vdm36tk2acx2xw9n5zgjljf9knaddpcmpvqsnw6sk3rfjh` |
+| **Ethereum (ETH) / USDT (ERC20)** | `0xe5f078820f26eaf15f7c763c40fc5044270050ec` |
+| **Tron (TRX) / USDT (TRC20)** | `TEaaV5RhYSWZs841dUxxYg5cVrUHteG3Rr` |
 
-> ⚠️ **توجه**: آدرس‌های بالا نمونه‌اند. لطفاً قبل از استفاده، آدرس‌های واقعی خودتان را جایگزین کنید در فایل `README.md`.
+> 💡 برای انتقال USDT با کمترین کارمزد، از شبکه **Tron (TRC20)** استفاده کنید.
 
 #### 💳 روش‌های دیگر
 
-- **Buy Me a Coffee**: [buymeacoffee.com/your-username](https://www.buymeacoffee.com/)
 - **GitHub Sponsors**: [github.com/sponsors/2vic1](https://github.com/sponsors/2vic1)
 
 متشکرم از حمایتت! 🙏
@@ -372,17 +369,14 @@ If you find this project useful, please consider supporting me:
 
 | Network | Address |
 |---------|---------|
-| **Bitcoin (BTC)** | `bc1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
-| **Ethereum (ETH) / USDT (ERC20)** | `0x........................................` |
-| **Tron (TRX) / USDT (TRC20)** | `T................................` |
-| **Solana (SOL)** | `................................` |
-| **TON** | `UQ................................` |
+| **Bitcoin (BTC)** | `bc1pj3dmcgpzf9d6vdm36tk2acx2xw9n5zgjljf9knaddpcmpvqsnw6sk3rfjh` |
+| **Ethereum (ETH) / USDT (ERC20)** | `0xe5f078820f26eaf15f7c763c40fc5044270050ec` |
+| **Tron (TRX) / USDT (TRC20)** | `TEaaV5RhYSWZs841dUxxYg5cVrUHteG3Rr` |
 
-> ⚠️ **Note**: The addresses above are placeholders. Please replace them with your real addresses in the `README.md` file before publishing.
+> 💡 For the lowest USDT transfer fees, use the **Tron (TRC20)** network.
 
 #### 💳 Other Methods
 
-- **Buy Me a Coffee**: [buymeacoffee.com/your-username](https://www.buymeacoffee.com/)
 - **GitHub Sponsors**: [github.com/sponsors/2vic1](https://github.com/sponsors/2vic1)
 
 Thank you for your support! 🙏
