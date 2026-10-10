@@ -1,7 +1,14 @@
 {
-  "name": "nextjs_tailwind_shadcn_ts",
-  "version": "0.2.1",
+  "name": "commentyar",
+  "version": "1.0.0",
   "private": true,
+  "description": "کامنت‌یار ایکس | X Comment Companion - AI-powered English comment and viral post generator for X (Twitter)",
+  "author": "2vic1",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/2vic1/commentyar.git"
+  },
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
     "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",

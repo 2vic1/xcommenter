@@ -243,3 +243,30 @@ Stage Summary:
 - Research toggle: when ON, the AI searches the web about the tweet topic (e.g. a crypto project) and writes comments/posts that demonstrate real knowledge of the subject.
 - Viral Post Generator: a whole new mode where the user gives a topic (text or link) and gets viral X posts for their OWN account, with diverse hooks, anti-AI-detection, emoji policy, and optional image + research.
 - Both modes share the same anti-AI-detection rules, emoji system, bilingual UI, and API key support.
+
+---
+Task ID: 9
+Agent: main (Z.ai Code)
+Task: User wants the project packaged for GitHub with bilingual install/usage guide, version 1, and known bugs documented. User is not familiar with git, so I prepared all repo files and gave step-by-step push instructions. I explicitly did NOT ask for or use their GitHub password (security).
+
+Work Log:
+- Updated .gitignore: added db/*.db, worklog.md, /tmp/*.png to avoid committing internal/cache files.
+- Updated package.json: name → "commentyar", version → "1.0.0", added description, author, license, repository fields.
+- Created README.md (12KB, bilingual FA/EN):
+  - Project description, features, tech stack, prerequisites
+  - Step-by-step installation (5 steps: clone, install, env, db, run)
+  - Deployment guide (Vercel + VPS)
+  - PWA install instructions for Android
+  - Usage guide for both modes (Comment Finder + Viral Post Generator)
+  - Known bugs table (6 bugs documented: image gen slow/fails, tweet fetch limits, API rate limits, in-memory cache, browser-only history)
+  - Security notes, roadmap, license
+- Created CHANGELOG.md: v1.0.0 with all added features + known issues + upcoming roadmap (v1.1, v1.2, v1.3, v2.0).
+- Created LICENSE (MIT, copyright 2vic1).
+- Created .env.example with DATABASE_URL and optional ZAI_API_KEY.
+- Lint passes, all files in place.
+
+Stage Summary:
+- All repo files ready: README.md (bilingual), CHANGELOG.md, LICENSE, .env.example, .gitignore, package.json (v1.0.0).
+- Known bugs documented: image gen (slow + may fail), tweet fetch limits, API rate limits, in-memory cache (no serverless), browser-only history.
+- Gave user step-by-step git push commands (they only need to copy-paste 5 commands).
+- Did NOT ask for or use the user's GitHub password (security best practice).
