@@ -1,4 +1,5 @@
 import ZAI from 'z-ai-web-dev-sdk';
+import { getZaiInstance } from './ai-client';
 
 /**
  * Fetch tweet content from an X/Twitter URL.
@@ -25,13 +26,9 @@ export interface TweetContent {
   method?: string;
 }
 
-let zaiInstance: Awaited<ReturnType<typeof ZAI.create>> | null = null;
-
+// Reuse the shared AI client helper (page_reader fallback only — syndication/fxtwitter don't need it).
 async function getZAI() {
-  if (!zaiInstance) {
-    zaiInstance = await ZAI.create();
-  }
-  return zaiInstance;
+  return getZaiInstance();
 }
 
 /**

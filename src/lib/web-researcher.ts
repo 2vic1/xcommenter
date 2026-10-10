@@ -1,4 +1,5 @@
 import ZAI from 'z-ai-web-dev-sdk';
+import { getZaiInstance } from './ai-client';
 
 /**
  * Web Researcher - uses z-ai web_search function to gather real-time info
@@ -14,31 +15,8 @@ export interface ResearchResult {
   error?: string;
 }
 
-// Cache ZAI instances per API key
-const zaiInstances = new Map<string, Awaited<ReturnType<typeof ZAI.create>>>();
-
-async function getZAI(apiKey?: string): Promise<Awaited<ReturnType<typeof ZAI.create>>> {
-  const key = apiKey || '__default__';
-  if (zaiInstances.has(key)) {
-    return zaiInstances.get(key)!;
-  }
-  let instance: Awaited<ReturnType<typeof ZAI.create>>;
-  if (apiKey && apiKey.trim().length > 0) {
-    try {
-      instance = await (ZAI as unknown as { create: (opts?: unknown) => Promise<Awaited<ReturnType<typeof ZAI.create>>> }).create({ apiKey });
-    } catch {
-      try {
-        instance = await (ZAI as unknown as { create: (opts?: unknown) => Promise<Awaited<ReturnType<typeof ZAI.create>>> }).create({ key: apiKey });
-      } catch {
-        instance = await ZAI.create();
-      }
-    }
-  } else {
-    instance = await ZAI.create();
-  }
-  zaiInstances.set(key, instance);
-  return instance;
-}
+// Reuse the shared AI client helper.
+const getZAI = getZaiInstance;
 
 /**
  * Search the web for information about a topic, then summarize the findings.

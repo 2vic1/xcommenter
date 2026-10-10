@@ -70,7 +70,12 @@ npm install
 فایل `.env` در ریشه پروژه بسازید:
 ```env
 DATABASE_URL="file:./db/custom.db"
+
+# (اختیاری) کلید شخصی z-ai — اگه نذاری، از API سایت استفاده میشه
+# ZAI_API_KEY="your-personal-z-ai-api-key-here"
 ```
+
+> 💡 **برای انتشار روی Vercel**: حتماً `ZAI_API_KEY` رو به‌عنوان Environment Variable تو پنل Vercel اضافه کن. بدون این، کامنت‌سازی کار نمی‌کنه (چون Vercel به فایل کانفیگ محلی دسترسی نداره).
 
 #### مرحله ۴: راه‌اندازی دیتابیس
 ```bash
@@ -255,7 +260,12 @@ npm install
 Create a `.env` file in the project root:
 ```env
 DATABASE_URL="file:./db/custom.db"
+
+# (Optional) Personal z-ai API key — if not set, the site API is used
+# ZAI_API_KEY="your-personal-z-ai-api-key-here"
 ```
+
+> 💡 **For Vercel deployment**: Make sure to add `ZAI_API_KEY` as an Environment Variable in the Vercel dashboard. Without it, comment generation won't work (Vercel doesn't have access to the local config file).
 
 #### Step 4: Set up the database
 ```bash

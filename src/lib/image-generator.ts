@@ -1,4 +1,5 @@
 import ZAI from 'z-ai-web-dev-sdk';
+import { getZaiInstance } from './ai-client';
 
 /**
  * Image Generator - uses z-ai-web-dev-sdk images.generations.create
@@ -13,31 +14,8 @@ export interface ImageResult {
   error?: string;
 }
 
-// Cache ZAI instances per API key (shared shape with comment-generator)
-const zaiInstances = new Map<string, Awaited<ReturnType<typeof ZAI.create>>>();
-
-async function getZAI(apiKey?: string): Promise<Awaited<ReturnType<typeof ZAI.create>>> {
-  const key = apiKey || '__default__';
-  if (zaiInstances.has(key)) {
-    return zaiInstances.get(key)!;
-  }
-  let instance: Awaited<ReturnType<typeof ZAI.create>>;
-  if (apiKey && apiKey.trim().length > 0) {
-    try {
-      instance = await (ZAI as unknown as { create: (opts?: unknown) => Promise<Awaited<ReturnType<typeof ZAI.create>>> }).create({ apiKey });
-    } catch {
-      try {
-        instance = await (ZAI as unknown as { create: (opts?: unknown) => Promise<Awaited<ReturnType<typeof ZAI.create>>> }).create({ key: apiKey });
-      } catch {
-        instance = await ZAI.create();
-      }
-    }
-  } else {
-    instance = await ZAI.create();
-  }
-  zaiInstances.set(key, instance);
-  return instance;
-}
+// Reuse the shared AI client helper.
+const getZAI = getZaiInstance;
 
 /**
  * Generate an image from a prompt and return it as a base64 data URL.
