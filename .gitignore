@@ -62,3 +62,20 @@ worklog.md
 
 # Generated images cache
 /tmp/*.png
+
+# Internal build/test scripts (not for public repo)
+.zscripts/build.sh
+.zscripts/database-runtime-build.sh
+.zscripts/mini-services-build.sh
+.zscripts/mini-services-install.sh
+.zscripts/mini-services-start.sh
+.zscripts/python-runtime-build.sh
+.zscripts/start.sh
+.zscripts/dev.pid
+.zscripts/dev.log
+
+# Internal tests
+/tests/
+
+# Internal download dir
+/download/
