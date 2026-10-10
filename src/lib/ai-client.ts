@@ -28,9 +28,11 @@ const ZAI_PUBLIC_BASE_URL = 'https://api.z.ai/api/paas/v4';
 
 // Default models for the public z-ai API.
 // Chat: glm-4-flash is free and fast. Users can override per-call.
-// Image: cogview-3-plus for image generation.
-const DEFAULT_CHAT_MODEL = 'glm-4-flash';
-const DEFAULT_IMAGE_MODEL = 'cogview-3-plus';
+// Image: cogview-3 for image generation.
+// If the user's API key doesn't support these, they can override per-call
+// or via the ZAI_CHAT_MODEL / ZAI_IMAGE_MODEL env vars.
+const DEFAULT_CHAT_MODEL = process.env.ZAI_CHAT_MODEL || 'glm-4-flash';
+const DEFAULT_IMAGE_MODEL = process.env.ZAI_IMAGE_MODEL || 'cogview-3';
 
 // Cache instances per source-key so we don't re-create on every request.
 const instanceCache = new Map<string, ZaiInstance>();
@@ -107,6 +109,7 @@ export async function getZaiInstance(explicitApiKey?: string): Promise<ZaiInstan
   }
 
   let instance: ZaiInstance;
+  let isPublicApi = false;
 
   if (resolved) {
     // Build the config and use the constructor directly (no filesystem access).
@@ -115,13 +118,17 @@ export async function getZaiInstance(explicitApiKey?: string): Promise<ZaiInstan
       apiKey: resolved,
     };
     instance = new (ZAI as unknown as new (config: ZaiConfig) => ZaiInstance)(config);
+    isPublicApi = true;
   } else {
     // Sandbox path — uses /etc/.z-ai-config automatically.
     instance = await ZAI.create();
   }
 
-  // Wrap so a default model is injected into every API call.
-  instance = wrapInstance(instance);
+  // Only inject the default model when using the PUBLIC API.
+  // The sandbox's internal API doesn't need (and may reject) an explicit model.
+  if (isPublicApi) {
+    instance = wrapInstance(instance);
+  }
 
   instanceCache.set(cacheKey, instance);
   return instance;
