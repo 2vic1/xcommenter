@@ -142,3 +142,37 @@ Stage Summary:
 - "Man," and similar noun-based openers (Dude, Bro, Girl, Boy) are now explicitly banned in the prompt and the rules file.
 - Replaced with clear interjection openers (Honestly, Actually, Turns out, For real, etc.) that non-native English speakers understand correctly.
 - Added a general principle: avoid culture-specific slang/idioms since the user's audience may have weak English.
+
+---
+Task ID: 6
+Agent: main (Z.ai Code)
+Task: Fix image generation failure — "Unexpected token '<', '<!DOCTYPE'... is not valid JSON" error when image toggle is on. Root cause: single request took ~77s (comments + image), causing gateway/browser timeout that returned an HTML error page instead of JSON. User also confirmed: one good image is enough.
+
+Work Log:
+- Diagnosis: The combined /api/generate-comment request (comments + image generation) took ~77 seconds. The Caddy gateway or browser fetch timed out and returned an HTML error page (<!DOCTYPE...>) which the frontend tried to parse as JSON → "Unexpected token '<'".
+- Split image generation into a SEPARATE endpoint:
+  - Created src/app/api/generate-image/route.ts — accepts { prompt, apiKey }, returns { success, dataUrl }. Set maxDuration=300s for the long image generation.
+  - Updated src/app/api/generate-comment/route.ts — REMOVED the image generation logic; now only returns the imagePrompt that the LLM produced. Removed the unused generateImage import.
+- Updated src/app/page.tsx:
+  - Added `imageLoading` state + `imageDataUrl` field to HistoryEntry.
+  - Removed `generateImage: generateImageEnabled` from the generate-comment request body.
+  - After comments are shown, if image is enabled and an imagePrompt exists, calls generateImageInBackground() which hits /api/generate-image separately.
+  - generateImageInBackground() updates the result + history entry when the image is ready, with proper error handling.
+  - Updated the image card UI to show a loading state (spinner + "در حال ساخت تصویر..." + skeleton) while imageLoading is true.
+  - handleRestoreFromHistory now also restores imageDataUrl from the history entry.
+- Verified with agent-browser:
+  - Comments now appear in ~10 seconds (down from 77s).
+  - Image card shows "در حال ساخت تصویر..." loading state immediately after comments.
+  - After ~60s, the image (1024x1024 PNG) appears in the card, no errors.
+  - No "Unexpected token '<'" error anymore.
+  - No console errors, no page errors, lint passes.
+- Direct API tests confirmed:
+  - /api/generate-comment now returns in ~5.5s (was 77s) with imagePrompt.
+  - /api/generate-image returns in ~59s with a 122KB base64 image.
+
+Stage Summary:
+- Image generation is now async/background — comments show fast, image loads when ready.
+- Fixed the "Unexpected token '<'" JSON parse error by eliminating the long combined request.
+- One image per generation (as the user requested — "یک دونه خوب بسازه").
+- Loading state clearly shown so the user knows the image is being built.
+- Image persists in history so restoring from history shows the image too.

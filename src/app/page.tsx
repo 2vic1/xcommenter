@@ -19,7 +19,6 @@ import {
   Lightbulb,
   MessageCircle,
   Download,
-  ImageIcon,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -90,6 +89,7 @@ interface HistoryEntry {
   comments: CommentSuggestion[];
   createdAt: number;
   settings: { tone: Tone; length: CommentLength; angle: Angle };
+  imageDataUrl?: string;
 }
 
 interface RulesResponse {
@@ -134,6 +134,7 @@ export default function Home() {
   const [generating, setGenerating] = React.useState(false);
   const [result, setResult] = React.useState<GenerateResult | null>(null);
   const [genError, setGenError] = React.useState('');
+  const [imageLoading, setImageLoading] = React.useState(false);
 
   // History
   const [history, setHistory] = React.useState<HistoryEntry[]>([]);
@@ -349,6 +350,7 @@ export default function Home() {
     setGenerating(true);
     setGenError('');
     setResult(null);
+    setImageLoading(false);
     try {
       const res = await fetch('/api/generate-comment', {
         method: 'POST',
@@ -363,7 +365,6 @@ export default function Home() {
           includeQuestion,
           englishLevel,
           count,
-          generateImage: generateImageEnabled,
           apiKey: effectiveApiKey,
         }),
       });
@@ -377,8 +378,8 @@ export default function Home() {
         comments: data.comments || [],
         tweetSummary: data.tweetSummary || '',
         imagePrompt: data.imagePrompt,
-        imageDataUrl: data.imageDataUrl,
-        imageError: data.imageError,
+        imageDataUrl: undefined,
+        imageError: undefined,
       };
       setResult(generated);
 
@@ -400,12 +401,71 @@ export default function Home() {
       setTimeout(() => {
         document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
+
+      // Generate the image SEPARATELY in the background (avoids the long
+      // single-request timeout that was causing HTML error pages instead of JSON).
+      if (generateImageEnabled && generated.imagePrompt && generated.imagePrompt.trim().length > 3) {
+        generateImageInBackground(generated.imagePrompt, effectiveApiKey, entry.id);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : t('toast.networkError');
       setGenError(msg);
       toast({ title: t('toast.networkError'), description: msg, variant: 'destructive' });
     } finally {
       setGenerating(false);
+    }
+  };
+
+  /**
+   * Generate the relevant image in the background, separately from comments.
+   * Updates the current result + history entry when the image is ready.
+   */
+  const generateImageInBackground = async (
+    imagePrompt: string,
+    apiKey: string | undefined,
+    historyEntryId: string
+  ) => {
+    setImageLoading(true);
+    try {
+      const res = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: imagePrompt, apiKey }),
+      });
+      const data = await res.json();
+      if (data.success && data.dataUrl) {
+        // Update the current result with the image
+        setResult((prev) =>
+          prev ? { ...prev, imageDataUrl: data.dataUrl, imageError: undefined } : prev
+        );
+        // Update the history entry too
+        setHistory((prevHistory) => {
+          const updated = prevHistory.map((h) =>
+            h.id === historyEntryId ? { ...h, imageDataUrl: data.dataUrl } : h
+          );
+          try {
+            localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+          } catch {
+            // ignore
+          }
+          return updated;
+        });
+        toast({ title: t('results.image') + ' ✓' });
+      } else {
+        const errMsg = data.error || 'unknown';
+        setResult((prev) => (prev ? { ...prev, imageError: errMsg } : prev));
+        toast({
+          title: t('results.imageError'),
+          description: errMsg,
+          variant: 'destructive',
+        });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : t('toast.networkError');
+      setResult((prev) => (prev ? { ...prev, imageError: msg } : prev));
+      toast({ title: t('results.imageError'), description: msg, variant: 'destructive' });
+    } finally {
+      setImageLoading(false);
     }
   };
 
@@ -416,7 +476,12 @@ export default function Home() {
 
   const handleRestoreFromHistory = (entry: HistoryEntry) => {
     setTweetContent(entry.tweetText);
-    setResult({ comments: entry.comments, tweetSummary: entry.tweetSummary });
+    setResult({
+      comments: entry.comments,
+      tweetSummary: entry.tweetSummary,
+      imageDataUrl: entry.imageDataUrl,
+      imageError: undefined,
+    });
     setTone(entry.settings.tone);
     setLength(entry.settings.length);
     setAngle(entry.settings.angle);
@@ -878,6 +943,9 @@ export default function Home() {
                     <CardTitle className="flex items-center gap-2 text-base">
                       <Sparkles className="h-4 w-4 text-primary" />
                       {t('results.image')}
+                      {imageLoading && (
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      )}
                     </CardTitle>
                     <CardDescription className="text-xs">{t('results.imageHint')}</CardDescription>
                   </CardHeader>
@@ -902,11 +970,15 @@ export default function Home() {
                           </a>
                         </div>
                       </div>
+                    ) : imageLoading ? (
+                      <div className="flex flex-col items-center justify-center gap-3 py-10">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        <p className="text-sm text-muted-foreground">{t('results.imageGenerating')}</p>
+                        <Skeleton className="h-64 w-64 rounded-lg" />
+                      </div>
                     ) : result.imageError ? (
                       <p className="text-sm text-destructive">{t('results.imageError')}: {result.imageError}</p>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">{t('results.imageError')}</p>
-                    )}
+                    ) : null}
                   </CardContent>
                 </Card>
               )}

@@ -4,7 +4,6 @@ import {
   type CommentOptions,
   type EmojiStyle,
 } from '@/lib/comment-generator';
-import { generateImage } from '@/lib/image-generator';
 
 export const runtime = 'nodejs';
 
@@ -36,7 +35,6 @@ export async function POST(request: NextRequest) {
       includeQuestion = false,
       englishLevel = 'simple',
       count = 5,
-      generateImage: shouldGenerateImage = false,
       apiKey,
     } = body as {
       tweetContent?: string;
@@ -48,7 +46,6 @@ export async function POST(request: NextRequest) {
       includeQuestion?: boolean;
       englishLevel?: string;
       count?: number;
-      generateImage?: boolean;
       apiKey?: string;
     };
 
@@ -92,25 +89,14 @@ export async function POST(request: NextRequest) {
 
     const result = await generateComments(tweetContent.trim(), options);
 
-    // Optionally generate an image (only if the LLM returned an imagePrompt)
-    let imageDataUrl: string | undefined;
-    let imageError: string | undefined;
-    if (shouldGenerateImage && result.imagePrompt && result.imagePrompt.trim().length > 3) {
-      const img = await generateImage(result.imagePrompt, safeApiKey);
-      if (img.success && img.dataUrl) {
-        imageDataUrl = img.dataUrl;
-      } else {
-        imageError = img.error;
-      }
-    }
-
+    // NOTE: Image generation is now handled by a SEPARATE endpoint (/api/generate-image)
+    // to avoid long request times. Here we only return the imagePrompt that the LLM produced.
+    // The frontend calls /api/generate-image with this prompt after comments are shown.
     return NextResponse.json({
       success: true,
       comments: result.comments,
       tweetSummary: result.tweetSummary,
       imagePrompt: result.imagePrompt,
-      imageDataUrl,
-      imageError,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
