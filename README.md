@@ -174,7 +174,30 @@ MIT License — آزاد برای استفاده شخصی و تجاری
 
 ### 🤝 مشارکت
 
-Pull Request و Issuewelcome!
+Pull Request و Issue welcome!
+
+### 💛 حمایت مالی | Support
+
+اگه این پروژه برات مفید بود، می‌تونی ازم حمایت کنی:
+
+#### 🪙 کریپتو (Crypto)
+
+| شبکه | آدرس |
+|------|------|
+| **Bitcoin (BTC)** | `bc1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
+| **Ethereum (ETH) / USDT (ERC20)** | `0x........................................` |
+| **Tron (TRX) / USDT (TRC20)** | `T................................` |
+| **Solana (SOL)** | `................................` |
+| **TON** | `UQ................................` |
+
+> ⚠️ **توجه**: آدرس‌های بالا نمونه‌اند. لطفاً قبل از استفاده، آدرس‌های واقعی خودتان را جایگزین کنید در فایل `README.md`.
+
+#### 💳 روش‌های دیگر
+
+- **Buy Me a Coffee**: [buymeacoffee.com/your-username](https://www.buymeacoffee.com/)
+- **GitHub Sponsors**: [github.com/sponsors/2vic1](https://github.com/sponsors/2vic1)
+
+متشکرم از حمایتت! 🙏
 
 ---
 
@@ -340,6 +363,29 @@ MIT License — Free for personal and commercial use
 ### 🤝 Contributing
 
 Pull Requests and Issues are welcome!
+
+### 💛 Support
+
+If you find this project useful, please consider supporting me:
+
+#### 🪙 Crypto
+
+| Network | Address |
+|---------|---------|
+| **Bitcoin (BTC)** | `bc1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
+| **Ethereum (ETH) / USDT (ERC20)** | `0x........................................` |
+| **Tron (TRX) / USDT (TRC20)** | `T................................` |
+| **Solana (SOL)** | `................................` |
+| **TON** | `UQ................................` |
+
+> ⚠️ **Note**: The addresses above are placeholders. Please replace them with your real addresses in the `README.md` file before publishing.
+
+#### 💳 Other Methods
+
+- **Buy Me a Coffee**: [buymeacoffee.com/your-username](https://www.buymeacoffee.com/)
+- **GitHub Sponsors**: [github.com/sponsors/2vic1](https://github.com/sponsors/2vic1)
+
+Thank you for your support! 🙏
 
 ---
 
