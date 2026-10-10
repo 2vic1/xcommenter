@@ -30,6 +30,7 @@ export interface CommentOptions {
   englishLevel: EnglishLevel;
   count: number;
   apiKey?: string; // optional personal API key
+  research?: string; // optional web research summary to inject into the prompt
 }
 
 export interface CommentSuggestion {
@@ -45,6 +46,22 @@ export interface GenerateResult {
   comments: CommentSuggestion[];
   tweetSummary: string; // Persian summary of what the tweet is about
   imagePrompt?: string; // English prompt to generate a relevant image
+  raw?: string;
+}
+
+export interface ViralPost {
+  text: string;
+  persianTranslation: string;
+  hookLabel: string; // Persian label for the viral hook style
+  hookKey: string;
+  reasoning: string; // Persian explanation of why this goes viral
+  wordCount: number;
+}
+
+export interface ViralGenerateResult {
+  posts: ViralPost[];
+  topicSummary: string; // Persian summary of the topic
+  imagePrompt?: string;
   raw?: string;
 }
 
@@ -180,7 +197,7 @@ ${xRules}
 
 === USER PREFERENCES ===
 ${userPreferences}
-
+${options.research ? `\n=== WEB RESEARCH CONTEXT (use this to write INFORMED, knowledgeable comments) ===\nThe user asked to research the topic of this tweet. Below is a factual briefing gathered from the web. Use specific facts/details from this research to make the comments show genuine understanding of the subject (e.g. if it's a crypto project, mention real features/tokenomics/roadmap points). Do NOT hallucinate beyond what's in the research.\n\n${options.research}\n` : ''}
 === CURRENT REQUEST SETTINGS ===
 - Tone: ${options.tone} (${TONE_LABELS[options.tone]})
 - Length: ${options.length} -> ${LENGTH_GUIDE[options.length]}
@@ -318,4 +335,205 @@ function parseResponse(raw: string, expectedCount: number): GenerateResult {
     imagePrompt: parsed.imagePrompt || '',
     raw,
   };
+}
+
+// ============================================================
+// VIRAL POST GENERATOR
+// ============================================================
+
+export type ViralHook =
+  | 'mixed'
+  | 'contrarian'
+  | 'list'
+  | 'story'
+  | 'thread'
+  | 'question'
+  | 'hot_take'
+  | 'data_point'
+  | 'vulnerability';
+
+export interface ViralOptions {
+  topic: string; // the topic the user wants to post about
+  tone: Tone;
+  emojiCount: number;
+  emojiStyle: EmojiStyle;
+  englishLevel: EnglishLevel;
+  count: number;
+  apiKey?: string;
+  research?: string; // web research summary
+}
+
+const HOOK_LABELS_PERSIAN: Record<string, string> = {
+  contrarian: 'جریان‌سواری محترمانه',
+  list: 'لیست ارزشمند',
+  story: 'داستان شخصی',
+  thread: 'تیتر ریسه‌ای',
+  question: 'سوال کنجکاوکننده',
+  hot_take: 'نظر جسورانه',
+  data_point: 'داده/آمار',
+  vulnerability: 'ضعف/صداقت',
+  mixed: 'متنوع',
+};
+
+const HOOK_GUIDE: Record<ViralHook, string> = {
+  mixed:
+    'a MIXED variety of viral hooks: contrarian take, numbered list, short story, thread-starter hook, provocative question, bold opinion, surprising stat, vulnerable admission. Provide diverse options.',
+  contrarian:
+    'CONTRARIAN takes that respectfully challenge a common belief in this niche (must be defensible, not trolling)',
+  list: 'NUMBERED LIST posts that deliver concrete value (e.g. "5 things I learned about...")',
+  story: 'SHORT STORY hooks that open a personal anecdote related to the topic',
+  thread: 'THREAD-STARTER hooks: a punchy first tweet that makes people want to read the rest',
+  question: 'PROVOCATIVE QUESTIONS that spark debate and replies',
+  hot_take: 'BOLD OPINIONS / hot takes that are defensible but polarizing',
+  data_point: 'SURPRISING STAT or data point that grabs attention and teaches something',
+  vulnerability: 'VULNERABLE admissions — honesty about a struggle/failure that builds trust',
+};
+
+function buildViralSystemPrompt(
+  xRules: string,
+  userPreferences: string,
+  options: ViralOptions
+): string {
+  return `You are a world-class X (Twitter) content strategist who writes viral posts that grow audiences — but you write like a real human, never like an AI.
+
+Your job: given a topic, write ${options.count} ENGLISH X posts designed to go viral and grow the author's following in that niche, while STRICTLY following X's rules and 2024-2025 algorithm.
+
+=== X / TWITTER PLATFORM RULES & 2024-2025 ALGORITHM (MUST follow) ===
+${xRules}
+
+=== USER PREFERENCES ===
+${userPreferences}
+${options.research ? `\n=== WEB RESEARCH CONTEXT (use this to write INFORMED, knowledgeable posts with real facts) ===\n${options.research}\n` : ''}
+=== CURRENT REQUEST SETTINGS ===
+- Topic: ${options.topic}
+- Tone: ${options.tone} (${TONE_LABELS[options.tone]})
+- Emoji policy: ${buildEmojiGuide(options as unknown as CommentOptions)}
+- English level: ${ENGLISH_LEVEL_GUIDE[options.englishLevel]}
+- Viral hook focus: ${HOOK_GUIDE[options.tone === 'mixed' ? 'mixed' : 'mixed']}
+
+=== ANTI-AI-DETECTION RULES (CRITICAL) ===
+1. BANNED OPENINGS: "This is...", "I appreciate...", "It's worth noting...", "What a great point...", "Spot on!", "Couldn't agree more!", "Great insights!", "As someone who...", "Would love to hear your thoughts!"
+2. BANNED noun-openers that confuse non-native readers: "Man,", "Dude,", "Bro,", "Girl,", "Boy,"
+3. BANNED patterns: em-dashes (—) overuse, semicolons, numbered lists INSIDE a single post, perfect formal grammar, AI clichés.
+4. REQUIRED: contractions (I've, don't, can't), varied sentence length, natural discourse markers (Honestly, Actually, Turns out, Funny enough, For real, Here's the thing —), one small human imperfection per post.
+5. The reader may have weak English — avoid culture-specific slang. Use clear, common words.
+6. Vary opening words across the ${options.count} posts.
+
+=== VIRAL POST PRINCIPLES (2024-2025) ===
+- Hook in the FIRST line (people scroll fast; if the first line doesn't grab, the post dies)
+- Each post should be self-contained (no "1/7" thread markers unless hookKey is 'thread')
+- Length: aim for 1-3 short paragraphs OR a punchy single line. NOT a wall of text.
+- Make people want to reply, bookmark, or quote-tweet
+- Include a concrete detail (number, name, specific outcome) — vague posts don't go viral
+- End in a way that invites engagement (a question, a bold claim, a counterintuitive close) — but NEVER end with the banned "Would love to hear your thoughts!"
+- Authenticity > polish. Real beats slick.
+
+=== STRICT OUTPUT RULES ===
+1. Respond with ONLY a valid JSON object. No markdown fences, no extra text.
+2. Shape:
+{
+  "topicSummary": "یک خلاصه کوتاه فارسی از موضوع",
+  "imagePrompt": "an English image-generation prompt for a relevant positive image (under 60 words)",
+  "posts": [
+    {
+      "hookKey": "contrarian|list|story|thread|question|hot_take|data_point|vulnerability",
+      "text": "the English post text",
+      "persianTranslation": "ترجمه فارسی دقیق و روان پست",
+      "reasoning": "توضیح فارسی کوتاه که چرا این پست وایرال میشه"
+    }
+  ]
+}
+3. Produce exactly ${options.count} posts. Each must be DISTINCT in hook and wording.
+4. Each post text must be in ENGLISH, ready to copy-paste, no quotes around it.
+5. persianTranslation MUST be a faithful Persian translation of the English "text".
+6. reasoning MUST be in PERSIAN and explain the viral logic.
+7. topicSummary MUST be in PERSIAN.
+8. Follow the emoji policy EXACTLY — count emojis per post.
+9. Posts must be directly relevant to the topic. Reference specifics.`;
+}
+
+function buildViralUserPrompt(options: ViralOptions): string {
+  return `Write ${options.count} viral X posts about this topic:
+
+"""
+${options.topic}
+"""
+
+Follow all rules, anti-AI-detection guidelines, and the emoji policy. Return ONLY the JSON object.`;
+}
+
+function parseViralResponse(raw: string, expectedCount: number): ViralGenerateResult {
+  let cleaned = raw.trim();
+  const fenceMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenceMatch) cleaned = fenceMatch[1].trim();
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    cleaned = cleaned.slice(firstBrace, lastBrace + 1);
+  }
+
+  let parsed: {
+    topicSummary?: string;
+    imagePrompt?: string;
+    posts?: Array<{
+      hookKey?: string;
+      text?: string;
+      persianTranslation?: string;
+      reasoning?: string;
+    }>;
+  };
+
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    return { posts: [], topicSummary: '', imagePrompt: '', raw };
+  }
+
+  const posts: ViralPost[] = (parsed.posts || [])
+    .filter((p) => p.text && p.text.trim().length > 0)
+    .slice(0, expectedCount)
+    .map((p) => {
+      const hookKey = (p.hookKey || 'mixed').toLowerCase();
+      const text = p.text!.trim();
+      return {
+        text,
+        persianTranslation: (p.persianTranslation || '').trim(),
+        hookKey,
+        hookLabel: HOOK_LABELS_PERSIAN[hookKey] || HOOK_LABELS_PERSIAN['mixed'],
+        reasoning: p.reasoning || '',
+        wordCount: text.split(/\s+/).filter(Boolean).length,
+      };
+    });
+
+  return {
+    posts,
+    topicSummary: parsed.topicSummary || '',
+    imagePrompt: parsed.imagePrompt || '',
+    raw,
+  };
+}
+
+/**
+ * Generate viral X posts about a topic.
+ */
+export async function generateViralPosts(
+  topic: string,
+  options: ViralOptions
+): Promise<ViralGenerateResult> {
+  const { xRules, userPreferences } = await getRules();
+  const zai = await getZAI(options.apiKey);
+
+  const systemPrompt = buildViralSystemPrompt(xRules, userPreferences, options);
+  const userPrompt = buildViralUserPrompt(options);
+
+  const completion = await zai.chat.completions.create({
+    messages: [
+      { role: 'assistant', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+    thinking: { type: 'disabled' },
+  });
+
+  const raw = completion.choices[0]?.message?.content || '';
+  return parseViralResponse(raw, options.count);
 }

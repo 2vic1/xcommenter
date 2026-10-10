@@ -206,3 +206,40 @@ Stage Summary:
 - The "Unexpected token '<'" error is permanently fixed for image generation.
 - Same pattern can be applied to any other long-running AI operation if needed.
 - Works in dev mode and on a VPS (long-running process). For serverless (Vercel), the in-memory Map would need to be replaced with a persistent store (Redis/DB), but the user plans to deploy on a VPS.
+
+---
+Task ID: 8
+Agent: main (Z.ai Code)
+Task: Add (1) a "research" toggle that searches the web about the tweet topic before writing comments, and (2) a new "Viral Post Generator" mode where the user gives a topic/link and the AI writes viral X posts for their own account.
+
+Work Log:
+- Loaded web-search skill; understood z-ai web_search function + LLM summarization pattern.
+- Created src/lib/web-researcher.ts — researchTopic(topic, apiKey) calls zai.functions.invoke('web_search', ...) then summarizes results with the LLM into a concise English briefing. Returns { success, summary, sources }.
+- Updated src/lib/comment-generator.ts:
+  - Added `research?: string` to CommentOptions.
+  - System prompt now injects the research summary as "WEB RESEARCH CONTEXT" so the LLM writes INFORMED comments (e.g. real crypto project features, not generic).
+  - Added full ViralPost/ViralGenerateResult/ViralOptions types + generateViralPosts() function with its own system prompt focused on viral X post principles (hook in first line, self-contained, concrete details, anti-AI-detection, emoji policy).
+- Created src/app/api/research/route.ts — POST { topic, apiKey } → { success, summary, sources }.
+- Created src/app/api/generate-viral/route.ts — POST { topic, tone, emojiCount, emojiStyle, englishLevel, count, apiKey, research } → { success, posts, topicSummary, imagePrompt }.
+- Updated src/app/api/generate-comment/route.ts — accepts `research` field, passes it to options.
+- Added ~30 translation keys (fa + en) for research toggle, viral mode, viral UI.
+- Created src/components/viral-post-card.tsx — colored hook badges (contrarian/list/story/thread/question/hot_take/data_point/vulnerability), copy button, Persian translation, reasoning.
+- Updated src/app/page.tsx:
+  - Added appMode state ('comment' | 'viral') with a mode switcher at the top (Comment Finder / Viral Post Generator).
+  - Added research toggle + research summary display in comment settings.
+  - handleGenerate now calls /api/research first (if enabled), then passes the summary to /api/generate-comment.
+  - Created a ViralMode component with its own topic textarea, count slider, research toggle, image toggle, and results grid using ViralPostCard.
+  - Viral mode generate button is a gradient orange→pink to visually distinguish it.
+- Verified with agent-browser:
+  - Mode switcher works (comment ↔ viral).
+  - Viral mode: generated 5 posts with diverse hooks (contrarian, list, story, question, hot_take), each with Persian translation + reasoning + relevant emoji. No "Man," openers.
+  - Comment mode with research: generated 5 informed comments about Cursor IDE (referencing debugging, boilerplate, AI agents, integration, coding skills). Research summary displayed in settings card.
+  - No console errors, no page errors, lint passes.
+- Direct API tests confirmed:
+  - /api/research returns in ~3s with 6 sources + 867-char summary.
+  - /api/generate-viral returns in ~10.5s with 3 viral posts + topic summary.
+
+Stage Summary:
+- Research toggle: when ON, the AI searches the web about the tweet topic (e.g. a crypto project) and writes comments/posts that demonstrate real knowledge of the subject.
+- Viral Post Generator: a whole new mode where the user gives a topic (text or link) and gets viral X posts for their OWN account, with diverse hooks, anti-AI-detection, emoji policy, and optional image + research.
+- Both modes share the same anti-AI-detection rules, emoji system, bilingual UI, and API key support.

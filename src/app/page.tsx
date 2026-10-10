@@ -19,6 +19,9 @@ import {
   Lightbulb,
   MessageCircle,
   Download,
+  Flame,
+  Search,
+  Sparkles as SparklesIcon,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -47,6 +50,7 @@ import {
 import { ThemeToggle } from '@/components/theme-toggle';
 import { LanguageToggle } from '@/components/language-toggle';
 import { CommentCard } from '@/components/comment-card';
+import { ViralPostCard } from '@/components/viral-post-card';
 import { useLanguage } from '@/components/language-provider';
 import { toast } from '@/hooks/use-toast';
 import type { TranslationKey } from '@/lib/translations';
@@ -104,8 +108,280 @@ interface RulesResponse {
 const HISTORY_KEY = 'commentyar-history';
 const MAX_HISTORY = 20;
 
+interface ViralModeProps {
+  t: (key: TranslationKey) => string;
+  viralTopic: string;
+  setViralTopic: (v: string) => void;
+  viralCount: number;
+  setViralCount: (v: number) => void;
+  viralResearchEnabled: boolean;
+  setViralResearchEnabled: (v: boolean) => void;
+  generateImageEnabled: boolean;
+  setGenerateImageEnabled: (v: boolean) => void;
+  viralGenerating: boolean;
+  researching: boolean;
+  viralError: string;
+  viralResult: {
+    posts: Array<{
+      text: string;
+      persianTranslation: string;
+      hookLabel: string;
+      hookKey: string;
+      reasoning: string;
+      wordCount: number;
+    }>;
+    topicSummary: string;
+    imagePrompt?: string;
+    imageDataUrl?: string;
+    imageError?: string;
+  } | null;
+  viralImageLoading: boolean;
+  onGenerate: () => void;
+}
+
+function ViralMode({
+  t,
+  viralTopic,
+  setViralTopic,
+  viralCount,
+  setViralCount,
+  viralResearchEnabled,
+  setViralResearchEnabled,
+  generateImageEnabled,
+  setGenerateImageEnabled,
+  viralGenerating,
+  researching,
+  viralError,
+  viralResult,
+  viralImageLoading,
+  onGenerate,
+}: ViralModeProps) {
+  const canGenerate = viralTopic.trim().length > 2 && !viralGenerating && !researching;
+
+  return (
+    <div className="space-y-6">
+      {/* Hero */}
+      <section className="text-center">
+        <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700 dark:bg-orange-950/40 dark:text-orange-300">
+          <Flame className="h-3.5 w-3.5" />
+          {t('hero.badge')}
+        </div>
+        <h2 className="mx-auto max-w-2xl text-2xl font-bold leading-tight sm:text-3xl">
+          {t('viral.title')}
+        </h2>
+        <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+          {t('viral.desc')}
+        </p>
+      </section>
+
+      {/* Topic input + settings */}
+      <div className="grid gap-6 lg:grid-cols-5">
+        <div className="lg:col-span-3">
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Flame className="h-5 w-5 text-orange-500" />
+                {t('viral.topicLabel')}
+              </CardTitle>
+              <CardDescription>{t('viral.topicHint')}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Textarea
+                  dir="ltr"
+                  placeholder={t('viral.topicPlaceholder')}
+                  value={viralTopic}
+                  onChange={(e) => setViralTopic(e.target.value)}
+                  className="ltr min-h-[120px] text-left text-sm"
+                />
+                <p className="text-xs text-muted-foreground">{t('viral.topicHint')}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="lg:col-span-2">
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Settings2 className="h-5 w-5 text-primary" />
+                {t('settings.title')}
+              </CardTitle>
+              <CardDescription>{t('settings.desc')}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold">{t('viral.count')}</Label>
+                  <Badge variant="secondary" className="tabular-nums">{viralCount}</Badge>
+                </div>
+                <Slider
+                  value={[viralCount]}
+                  onValueChange={(v) => setViralCount(v[0])}
+                  min={3}
+                  max={8}
+                  step={1}
+                />
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="viral-research-switch" className="flex items-center gap-1 text-xs font-semibold">
+                      <Search className="h-3 w-3" />
+                      {t('viral.researchToggle')}
+                    </Label>
+                    <p className="text-[11px] text-muted-foreground">{t('viral.researchHint')}</p>
+                  </div>
+                  <Switch id="viral-research-switch" checked={viralResearchEnabled} onCheckedChange={setViralResearchEnabled} disabled={researching} />
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="viral-image-switch" className="text-xs font-semibold">{t('settings.image')}</Label>
+                    <p className="text-[11px] text-muted-foreground">{t('settings.imageHint')}</p>
+                  </div>
+                  <Switch id="viral-image-switch" checked={generateImageEnabled} onCheckedChange={setGenerateImageEnabled} />
+                </div>
+              </div>
+
+              {researching && (
+                <div className="flex items-center gap-2 rounded-md border border-primary/20 bg-primary/5 p-2 text-xs text-primary">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  {t('settings.researching')}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Generate button */}
+      <div className="flex justify-center">
+        <Button
+          size="lg"
+          onClick={onGenerate}
+          disabled={!canGenerate}
+          className="h-12 gap-2 bg-gradient-to-r from-orange-500 to-pink-500 px-8 text-base text-white shadow-md hover:from-orange-600 hover:to-pink-600"
+        >
+          {viralGenerating ? (
+            <>
+              <Loader2 className="h-5 w-5 animate-spin" />
+              {t('viral.generating')}
+            </>
+          ) : (
+            <>
+              <Flame className="h-5 w-5" />
+              {t('viral.generate')}
+            </>
+          )}
+        </Button>
+      </div>
+
+      {/* Results */}
+      <section id="viral-results-section" className="mt-6 scroll-mt-20">
+        {viralGenerating && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {t('results.analyzing')}
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              {Array.from({ length: viralCount }).map((_, i) => (
+                <Skeleton key={i} className="h-52 w-full rounded-xl" />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!viralGenerating && viralError && (
+          <Card className="border-destructive/30">
+            <CardContent className="flex items-start gap-3 pt-6">
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+              <div>
+                <p className="font-semibold text-destructive">{t('toast.genErrorTitle')}</p>
+                <p className="text-sm text-muted-foreground">{viralError}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {!viralGenerating && !viralError && viralResult && (
+          <div className="space-y-5">
+            {viralResult.topicSummary && (
+              <Card className="border-orange-200 bg-orange-50/50 dark:border-orange-900 dark:bg-orange-950/20">
+                <CardContent className="flex items-start gap-3 pt-6">
+                  <Lightbulb className="mt-0.5 h-5 w-5 shrink-0 text-orange-500" />
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground">{t('viral.summary')}</p>
+                    <p className="mt-1 text-sm leading-relaxed">{viralResult.topicSummary}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Image */}
+            {generateImageEnabled && (
+              <Card className="overflow-hidden">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    {t('results.image')}
+                    {viralImageLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {viralResult.imageDataUrl ? (
+                    <div className="overflow-hidden rounded-lg border">
+                      <img src={viralResult.imageDataUrl} alt={t('results.image')} className="mx-auto max-h-80 w-auto object-contain" />
+                    </div>
+                  ) : viralImageLoading ? (
+                    <div className="flex flex-col items-center justify-center gap-3 py-10">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      <p className="text-sm text-muted-foreground">{t('results.imageGenerating')}</p>
+                      <Skeleton className="h-64 w-64 rounded-lg" />
+                    </div>
+                  ) : viralResult.imageError ? (
+                    <p className="text-sm text-destructive">{t('results.imageError')}: {viralResult.imageError}</p>
+                  ) : null}
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="flex items-center justify-between">
+              <h3 className="flex items-center gap-2 text-lg font-bold">
+                <Flame className="h-5 w-5 text-orange-500" />
+                {viralResult.posts.length} {t('viral.results')}
+              </h3>
+              <span className="text-xs text-muted-foreground">{t('results.copyHint')}</span>
+            </div>
+
+            {viralResult.posts.length === 0 ? (
+              <Card>
+                <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                  {t('viral.empty')}
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {viralResult.posts.map((p, i) => (
+                  <ViralPostCard key={i} post={p} index={i} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
 export default function Home() {
   const { t, lang, dir } = useLanguage();
+
+  // App mode: 'comment' = reply finder, 'viral' = viral post generator
+  const [appMode, setAppMode] = React.useState<'comment' | 'viral'>('comment');
 
   // Input state
   const [inputMode, setInputMode] = React.useState<'link' | 'text'>('text');
@@ -124,6 +400,31 @@ export default function Home() {
   const [includeQuestion, setIncludeQuestion] = React.useState(false);
   const [count, setCount] = React.useState(5);
   const [generateImageEnabled, setGenerateImageEnabled] = React.useState(false);
+  const [researchEnabled, setResearchEnabled] = React.useState(false);
+  const [researching, setResearching] = React.useState(false);
+  const [researchSummary, setResearchSummary] = React.useState('');
+
+  // Viral mode state
+  const [viralTopic, setViralTopic] = React.useState('');
+  const [viralCount, setViralCount] = React.useState(5);
+  const [viralResearchEnabled, setViralResearchEnabled] = React.useState(false);
+  const [viralGenerating, setViralGenerating] = React.useState(false);
+  const [viralError, setViralError] = React.useState('');
+  const [viralResult, setViralResult] = React.useState<{
+    posts: Array<{
+      text: string;
+      persianTranslation: string;
+      hookLabel: string;
+      hookKey: string;
+      reasoning: string;
+      wordCount: number;
+    }>;
+    topicSummary: string;
+    imagePrompt?: string;
+    imageDataUrl?: string;
+    imageError?: string;
+  } | null>(null);
+  const [viralImageLoading, setViralImageLoading] = React.useState(false);
 
   // API key settings
   const [apiSource, setApiSource] = React.useState<'site' | 'personal'>('site');
@@ -347,6 +648,37 @@ export default function Home() {
       });
       return;
     }
+
+    // Optional: research the topic on the web before generating comments.
+    let researchContext: string | undefined;
+    if (researchEnabled) {
+      setResearching(true);
+      try {
+        const rres = await fetch('/api/research', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic: effectiveContent.slice(0, 400), apiKey: effectiveApiKey }),
+        });
+        const rdata = await rres.json();
+        if (rdata.success && rdata.summary) {
+          researchContext = rdata.summary;
+          setResearchSummary(rdata.summary);
+          toast({ title: t('settings.researchDone') });
+        } else {
+          toast({
+            title: t('settings.researchFailed'),
+            description: rdata.error || '',
+            variant: 'destructive',
+          });
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : t('toast.networkError');
+        toast({ title: t('settings.researchFailed'), description: msg, variant: 'destructive' });
+      } finally {
+        setResearching(false);
+      }
+    }
+
     setGenerating(true);
     setGenError('');
     setResult(null);
@@ -366,6 +698,7 @@ export default function Home() {
           englishLevel,
           count,
           apiKey: effectiveApiKey,
+          research: researchContext,
         }),
       });
       const data = await res.json();
@@ -503,6 +836,149 @@ export default function Home() {
     }
   };
 
+  /**
+   * Generate viral posts about a topic. Optionally researches the topic first.
+   */
+  const handleGenerateViral = async () => {
+    const topic = viralTopic.trim();
+    if (!topic) {
+      toast({
+        title: t('toast.contentRequired'),
+        description: t('viral.topicPlaceholder'),
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Optional research first
+    let researchContext: string | undefined;
+    if (viralResearchEnabled) {
+      setResearching(true);
+      try {
+        const rres = await fetch('/api/research', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic: topic.slice(0, 400), apiKey: effectiveApiKey }),
+        });
+        const rdata = await rres.json();
+        if (rdata.success && rdata.summary) {
+          researchContext = rdata.summary;
+          toast({ title: t('settings.researchDone') });
+        } else {
+          toast({
+            title: t('settings.researchFailed'),
+            description: rdata.error || '',
+            variant: 'destructive',
+          });
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : t('toast.networkError');
+        toast({ title: t('settings.researchFailed'), description: msg, variant: 'destructive' });
+      } finally {
+        setResearching(false);
+      }
+    }
+
+    setViralGenerating(true);
+    setViralError('');
+    setViralResult(null);
+    setViralImageLoading(false);
+    try {
+      const res = await fetch('/api/generate-viral', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic,
+          tone,
+          emojiCount,
+          emojiStyle,
+          englishLevel,
+          count: viralCount,
+          apiKey: effectiveApiKey,
+          research: researchContext,
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        setViralError(data.error || t('toast.genError'));
+        toast({ title: t('toast.genError'), description: data.error, variant: 'destructive' });
+        return;
+      }
+      const generated = {
+        posts: data.posts || [],
+        topicSummary: data.topicSummary || '',
+        imagePrompt: data.imagePrompt,
+      };
+      setViralResult(generated);
+      toast({
+        title: `${generated.posts.length} ${t('toast.viralGenerated')}`,
+        description: t('toast.generatedDesc'),
+      });
+      setTimeout(() => {
+        document.getElementById('viral-results-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+
+      // Generate image in background if enabled
+      if (generateImageEnabled && generated.imagePrompt && generated.imagePrompt.trim().length > 3) {
+        generateViralImageInBackground(generated.imagePrompt, effectiveApiKey);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : t('toast.networkError');
+      setViralError(msg);
+      toast({ title: t('toast.networkError'), description: msg, variant: 'destructive' });
+    } finally {
+      setViralGenerating(false);
+    }
+  };
+
+  /**
+   * Generate the image for a viral post in the background (same job/poll approach).
+   */
+  const generateViralImageInBackground = async (imagePrompt: string, apiKey: string | undefined) => {
+    setViralImageLoading(true);
+    try {
+      const startRes = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: imagePrompt, apiKey }),
+      });
+      const startData = await startRes.json();
+      if (!startData.success || !startData.jobId) {
+        const errMsg = startData.error || 'unknown';
+        setViralResult((prev) => (prev ? { ...prev, imageError: errMsg } : prev));
+        toast({ title: t('results.imageError'), description: errMsg, variant: 'destructive' });
+        return;
+      }
+      const jobId = startData.jobId as string;
+      const POLL_MS = 3000;
+      const MAX_MS = 180000;
+      const start = Date.now();
+      while (true) {
+        if (Date.now() - start > MAX_MS) throw new Error('Image timed out (3 min).');
+        await new Promise((r) => setTimeout(r, POLL_MS));
+        const pollRes = await fetch(`/api/generate-image?jobId=${encodeURIComponent(jobId)}`);
+        const ct = pollRes.headers.get('content-type') || '';
+        if (!ct.includes('application/json')) throw new Error('Non-JSON response during polling.');
+        const pollData = await pollRes.json();
+        if (!pollData.success) throw new Error(pollData.error || 'Polling failed.');
+        if (pollData.status === 'done' && pollData.dataUrl) {
+          setViralResult((prev) =>
+            prev ? { ...prev, imageDataUrl: pollData.dataUrl, imageError: undefined } : prev
+          );
+          toast({ title: t('results.image') + ' ✓' });
+          return;
+        }
+        if (pollData.status === 'error') throw new Error(pollData.error || 'Image failed.');
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : t('toast.networkError');
+      setViralResult((prev) => (prev ? { ...prev, imageError: msg } : prev));
+      toast({ title: t('results.imageError'), description: msg, variant: 'destructive' });
+    } finally {
+      setViralImageLoading(false);
+    }
+  };
+
   const handleClearHistory = () => {
     persistHistory([]);
     toast({ title: t('toast.historyCleared') });
@@ -566,6 +1042,58 @@ export default function Home() {
       </header>
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:py-8">
+        {/* Mode switcher */}
+        <div className="mb-6 flex justify-center">
+          <div className="inline-grid w-full max-w-md grid-cols-2 gap-1 rounded-xl border bg-muted/40 p-1">
+            <button
+              type="button"
+              onClick={() => setAppMode('comment')}
+              className={cn(
+                'flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all',
+                appMode === 'comment'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <MessageCircle className="h-4 w-4" />
+              {t('app.modeComment')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setAppMode('viral')}
+              className={cn(
+                'flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all',
+                appMode === 'viral'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <Flame className="h-4 w-4 text-orange-500" />
+              {t('app.modeViral')}
+            </button>
+          </div>
+        </div>
+
+        {appMode === 'viral' ? (
+          <ViralMode
+            t={t}
+            viralTopic={viralTopic}
+            setViralTopic={setViralTopic}
+            viralCount={viralCount}
+            setViralCount={setViralCount}
+            viralResearchEnabled={viralResearchEnabled}
+            setViralResearchEnabled={setViralResearchEnabled}
+            generateImageEnabled={generateImageEnabled}
+            setGenerateImageEnabled={setGenerateImageEnabled}
+            viralGenerating={viralGenerating}
+            researching={researching}
+            viralError={viralError}
+            viralResult={viralResult}
+            viralImageLoading={viralImageLoading}
+            onGenerate={handleGenerateViral}
+          />
+        ) : (
+          <>
         {/* Hero */}
         <section className="mb-8 text-center">
           <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border bg-muted/50 px-3 py-1 text-xs font-medium text-muted-foreground">
@@ -832,12 +1360,36 @@ export default function Home() {
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <div className="space-y-0.5">
+                      <Label htmlFor="research-switch" className="text-xs font-semibold">
+                        <span className="flex items-center gap-1">
+                          <Search className="h-3 w-3" />
+                          {t('settings.research')}
+                        </span>
+                      </Label>
+                      <p className="text-[11px] text-muted-foreground">{t('settings.researchHint')}</p>
+                    </div>
+                    <Switch id="research-switch" checked={researchEnabled} onCheckedChange={setResearchEnabled} disabled={researching} />
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="space-y-0.5">
                       <Label htmlFor="image-switch" className="text-xs font-semibold">{t('settings.image')}</Label>
                       <p className="text-[11px] text-muted-foreground">{t('settings.imageHint')}</p>
                     </div>
                     <Switch id="image-switch" checked={generateImageEnabled} onCheckedChange={setGenerateImageEnabled} />
                   </div>
                 </div>
+                {researching && (
+                  <div className="flex items-center gap-2 rounded-md border border-primary/20 bg-primary/5 p-2 text-xs text-primary">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    {t('settings.researching')}
+                  </div>
+                )}
+                {researchSummary && researchEnabled && !researching && (
+                  <div className="max-h-32 overflow-y-auto scrollbar-thin rounded-md border bg-muted/30 p-2 text-[11px] leading-relaxed text-muted-foreground">
+                    <span className="font-semibold text-foreground">{t('settings.researchDone')}: </span>
+                    {researchSummary.slice(0, 300)}{researchSummary.length > 300 ? '...' : ''}
+                  </div>
+                )}
 
                 <Separator />
 
@@ -1160,6 +1712,8 @@ export default function Home() {
             </CardContent>
           </Card>
         </section>
+          </>
+        )}
       </main>
 
       {/* Sticky Footer */}

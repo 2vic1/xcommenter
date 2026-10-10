@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
       englishLevel = 'simple',
       count = 5,
       apiKey,
+      research,
     } = body as {
       tweetContent?: string;
       tone?: string;
@@ -47,6 +48,7 @@ export async function POST(request: NextRequest) {
       englishLevel?: string;
       count?: number;
       apiKey?: string;
+      research?: string;
     };
 
     if (!tweetContent || typeof tweetContent !== 'string' || tweetContent.trim().length < 3) {
@@ -85,6 +87,8 @@ export async function POST(request: NextRequest) {
       englishLevel: safeLevel,
       count: safeCount,
       apiKey: safeApiKey,
+      research:
+        typeof research === 'string' && research.trim().length > 10 ? research.trim() : undefined,
     };
 
     const result = await generateComments(tweetContent.trim(), options);
