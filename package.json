@@ -1,5 +1,5 @@
 {
-  "name": "commentyar",
+  "name": "xcommenter",
   "version": "1.0.0",
   "private": true,
   "description": "کامنت‌یار ایکس | X Comment Companion - AI-powered English comment and viral post generator for X (Twitter)",
@@ -7,7 +7,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/2vic1/commentyar.git"
+    "url": "https://github.com/2vic1/xcommenter.git"
   },
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",

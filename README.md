@@ -53,8 +53,8 @@
 
 #### مرحله ۱: کلون کردن پروژه
 ```bash
-git clone https://github.com/2vic1/commentyar.git
-cd commentyar
+git clone https://github.com/2vic1/xcommenter.git
+cd xcommenter
 ```
 
 #### مرحله ۲: نصب پکیج‌ها
@@ -109,14 +109,14 @@ git push origin main
 
 ```bash
 # نصب
-git clone https://github.com/2vic1/commentyar.git
-cd commentyar
+git clone https://github.com/2vic1/xcommenter.git
+cd xcommenter
 bun install
 bun run build
 
 # اجرا با PM2
 npm install -g pm2
-pm2 start "bun .next/standalone/server.js" --name commentyar
+pm2 start "bun .next/standalone/server.js" --name xcommenter
 pm2 startup
 pm2 save
 ```
@@ -238,8 +238,8 @@ Pull Request و Issue welcome!
 
 #### Step 1: Clone the project
 ```bash
-git clone https://github.com/2vic1/commentyar.git
-cd commentyar
+git clone https://github.com/2vic1/xcommenter.git
+cd xcommenter
 ```
 
 #### Step 2: Install dependencies
@@ -294,14 +294,14 @@ git push origin main
 
 ```bash
 # Install
-git clone https://github.com/2vic1/commentyar.git
-cd commentyar
+git clone https://github.com/2vic1/xcommenter.git
+cd xcommenter
 bun install
 bun run build
 
 # Run with PM2
 npm install -g pm2
-pm2 start "bun .next/standalone/server.js" --name commentyar
+pm2 start "bun .next/standalone/server.js" --name xcommenter
 pm2 startup
 pm2 save
 ```
