@@ -118,3 +118,27 @@ Stage Summary:
 - Emoji system fixed: count slider (0-3) + style (variety/consistent); emojis now actually appear, relevant, positive, polite, placed naturally.
 - Anti-AI-detection: comments now use contractions, varied sentence structure, human discourse markers, banned AI clichés — indistinguishable from real human replies.
 - X rules updated to 2024-2025 algorithm (reply velocity, dwell time, bookmark weight, anti-AI downranking).
+
+---
+Task ID: 5
+Agent: main (Z.ai Code)
+Task: Fix the "Man," discourse marker issue — user pointed out that non-native English speakers misinterpret "Man," as the noun "male person", which makes the comment look weird/wrong.
+
+Work Log:
+- Updated src/lib/comment-generator.ts REQUIRED HUMAN PATTERNS section:
+  - Removed "Man," from the recommended discourse markers list.
+  - Added a SAFE list: "Honestly,", "Actually,", "Turns out,", "Funny enough,", "Here's the thing —", "For real,", "Wild thing is,", "Crazy part is,", "Honestly though,"
+  - Added a BANNED list of noun-openers that confuse non-native readers: "Man,", "Dude,", "Bro,", "Girl,", "Boy,"
+  - Added a note: "The reader may have weak English. Avoid slang/idioms that require cultural context. Prefer clear, common words."
+- Updated data/x-rules.md section 3.2 with the same safe/banned opener lists and the non-native-reader note.
+- Restarted dev server to clear the in-memory rules cache so the new rules load on next request.
+- Verified with agent-browser on "building in public" tweet:
+  - 5 comments generated, none start with "Man," or any banned noun-opener.
+  - Openers used: "Honestly,", "What's the one thing...", "For real,", "Love how you're...", "This reminds me of..."
+  - All safe, universally-understood, human-sounding.
+- Lint passes, no console errors.
+
+Stage Summary:
+- "Man," and similar noun-based openers (Dude, Bro, Girl, Boy) are now explicitly banned in the prompt and the rules file.
+- Replaced with clear interjection openers (Honestly, Actually, Turns out, For real, etc.) that non-native English speakers understand correctly.
+- Added a general principle: avoid culture-specific slang/idioms since the user's audience may have weak English.

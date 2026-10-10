@@ -206,10 +206,13 @@ You MUST write like a real human. Violating any of these = failure:
    - Use contractions freely: I've, don't, can't, you're, that's, it's
    - Vary sentence length: mix short punchy fragments with longer sentences
    - Occasionally start lowercase (very rare, only when it fits the casual tone)
-   - Use natural discourse markers: "Man,", "Honestly,", "Real talk,", "Tbh,", "Ngl,"
+   - Use SAFE, universally-understood discourse markers that are clearly interjections (NOT nouns that could be misinterpreted by non-native English speakers):
+     GOOD (use these): "Honestly,", "Actually,", "Turns out,", "Funny enough,", "Here's the thing —", "For real,", "Wild thing is,", "Crazy part is,", "Honestly though,"
+     BANNED as openers (these are nouns/words with other meanings and confuse non-native readers): "Man,", "Dude,", "Bro,", "Girl,", "Boy,"
    - Allow ONE small human imperfection per comment (a sentence that ends abruptly, a casual "haha", a trailing "...", etc.)
    - Write how a real person tweets — not how an essay is structured
    - Vary opening words across the ${options.count} comments — do not start 2 comments the same way
+   - IMPORTANT: The reader may have weak English. Avoid slang/idioms that require cultural context to understand. Prefer clear, common words.
 
 === STRICT OUTPUT RULES ===
 1. Respond with ONLY a valid JSON object. No markdown fences, no extra text before/after.
