@@ -28,3 +28,29 @@ Stage Summary:
 - Golden path verified end-to-end in browser: paste tweet text → choose settings → generate → 5 relevant English comments with copy buttons + Persian explanations → history auto-saved.
 - Link-fetch mode is a bonus; robust text-paste fallback always available since X blocks scraping.
 - Files produced: data/x-rules.md, data/user-preferences.md, src/lib/rules-cache.ts, src/lib/tweet-fetcher.ts, src/lib/comment-generator.ts, src/app/api/{fetch-tweet,generate-comment,rules}/route.ts, src/components/{theme-provider,theme-toggle,comment-card}.tsx, src/app/{layout,page}.tsx, globals.css updated.
+
+---
+Task ID: 2
+Agent: main (Z.ai Code)
+Task: Make link-based tweet fetching reliable so the user only needs to paste a tweet URL (no manual text entry required). User explicitly wants: "I give the link, it suggests comments based on that."
+
+Work Log:
+- Rewrote src/lib/tweet-fetcher.ts with a multi-method fallback chain:
+  1. Twitter/X Syndication API (cdn.syndication.twimg.com/tweet-result) — public, no auth, returns clean JSON. This is the endpoint used for embedded tweets. Also handles quoted tweets (appends quoted text for AI context).
+  2. fxtwitter API (api.fxtwitter.com/status/{id}) — public proxy fallback.
+  3. z-ai page_reader — last resort (often blocked by X login wall).
+- Added extractTweetId() helper to pull the numeric status ID from the URL.
+- Added 8s timeout per fetch method to avoid hanging.
+- Updated src/app/page.tsx handleGenerate: if tweetContent is empty but tweetUrl is present, auto-fetch the link first, then generate. So the user can just paste a link and click generate in one step.
+- Updated canGenerate: button is now enabled when either text (>2 chars) OR a link (>5 chars) is present.
+- Updated generate button label to show "در حال دریافت توییت..." during the auto-fetch phase.
+- Verified with agent-browser using Jack Dorsey's first tweet (https://x.com/jack/status/20):
+  - Syndication API returned "just setting up my twttr" in 425ms.
+  - Full flow (paste link → click generate → auto-fetch → 5 comments generated) works end-to-end.
+  - Comments are relevant to the tweet content (nostalgia, simplicity, early-twitter references).
+- Lint passes, no console errors, no runtime errors.
+
+Stage Summary:
+- The "just paste a link" use case now works reliably for public tweets via the syndication API (the same mechanism X uses for embedded tweets).
+- Both modes still available: link mode (auto-fetches) and text mode (paste manually). Text mode remains the bulletproof fallback for private/deleted tweets.
+- UI structure unchanged per user request; only the backend fetcher + generate button logic were improved.

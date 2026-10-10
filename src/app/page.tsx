@@ -236,10 +236,54 @@ export default function Home() {
   };
 
   const handleGenerate = async () => {
-    if (!tweetContent.trim()) {
+    // If there is no tweet text but a link is provided, auto-fetch the link first.
+    let effectiveContent = tweetContent.trim();
+    if (!effectiveContent && tweetUrl.trim()) {
+      setFetching(true);
+      setFetchError('');
+      try {
+        const fres = await fetch('/api/fetch-tweet', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: tweetUrl }),
+        });
+        const fdata = await fres.json();
+        if (fdata.success && fdata.text && fdata.text.trim().length > 0) {
+          effectiveContent = fdata.text.trim();
+          setTweetContent(effectiveContent);
+          toast({
+            title: 'متن توییت از لینک دریافت شد',
+            description: fdata.author ? `نویسنده: @${fdata.author}` : undefined,
+          });
+        } else {
+          toast({
+            title: 'دریافت توییت ناموفق',
+            description:
+              'ایکس اجازه خواندن خودکار نداد. لطفاً متن توییت را مستقیم کپی کنید.',
+            variant: 'destructive',
+          });
+          setFetchError(
+            fdata.error || 'متن توییت از لینک استخراج نشد.'
+          );
+          return;
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'خطای شبکه';
+        toast({
+          title: 'خطا در دریافت لینک',
+          description: msg,
+          variant: 'destructive',
+        });
+        return;
+      } finally {
+        setFetching(false);
+      }
+    }
+
+    if (!effectiveContent) {
       toast({
-        title: 'متن توییت خالی است',
-        description: 'ابتدا یک لینک وارد کنید یا متن توییت را مستقیم بنویسید.',
+        title: 'متن یا لینک توییت خالی است',
+        description: 'یک لینک توییت وارد کنید یا متنش را مستقیم بنویسید.',
         variant: 'destructive',
       });
       return;
@@ -321,7 +365,10 @@ export default function Home() {
     }, 100);
   };
 
-  const canGenerate = tweetContent.trim().length > 2 && !generating;
+  const canGenerate =
+    (tweetContent.trim().length > 2 || tweetUrl.trim().length > 5) &&
+    !generating &&
+    !fetching;
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -614,7 +661,12 @@ export default function Home() {
             disabled={!canGenerate}
             className="h-12 gap-2 px-8 text-base shadow-md"
           >
-            {generating ? (
+            {fetching ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                در حال دریافت توییت...
+              </>
+            ) : generating ? (
               <>
                 <Loader2 className="h-5 w-5 animate-spin" />
                 در حال تولید کامنت...
