@@ -176,3 +176,33 @@ Stage Summary:
 - One image per generation (as the user requested — "یک دونه خوب بسازه").
 - Loading state clearly shown so the user knows the image is being built.
 - Image persists in history so restoring from history shows the image too.
+
+---
+Task ID: 7
+Agent: main (Z.ai Code)
+Task: Fix the recurring "Unexpected token '<'" error on image generation. The previous fix (separate endpoint) still had the same problem because the single POST request took ~60s and the gateway timed out, returning HTML.
+
+Work Log:
+- Root cause confirmed: even with a separate /api/generate-image endpoint, a single HTTP request that takes ~60s exceeds the Caddy gateway timeout. The gateway returns an HTML error page, which the frontend tries to parse as JSON → "Unexpected token '<'".
+- Implemented a JOB-BASED POLLING architecture so no single HTTP request takes more than ~1s:
+  - Rewrote src/app/api/generate-image/route.ts:
+    - POST: starts a background job (stored in an in-memory Map), returns { success, jobId } immediately (<1s). The actual image generation runs in a fire-and-forget async IIFE that updates the job status when done.
+    - GET (with ?jobId=xxx): returns the current job status ({ status: 'pending' | 'done' | 'error', dataUrl?, error? }). Fast (<100ms).
+    - Added a setInterval cleanup that removes jobs older than 10 minutes to bound memory.
+    - Set maxDuration=300 for the route.
+  - Updated src/app/page.tsx generateImageInBackground():
+    - Step 1: POST to start the job, get jobId (fast).
+    - Step 2: Poll GET every 3s until status is 'done' or 'error'. Max 3 minutes.
+    - Added a content-type guard: if a poll response isn't JSON (e.g. HTML error), bail gracefully with a clear error message instead of crashing on JSON.parse.
+- Verified end-to-end with agent-browser:
+  - POST returns jobId in <1s.
+  - Polling shows "pending" → "pending" → "done" over ~65s.
+  - Image (1024x1024 PNG, 128KB) appears in the UI with no "Unexpected token" error.
+  - Loading state ("در حال ساخت تصویر...") shows during polling.
+  - No console errors, no page errors, lint passes (0 errors, 0 warnings).
+
+Stage Summary:
+- Image generation now uses a job/poll pattern: each HTTP request is <2s, so the gateway never times out.
+- The "Unexpected token '<'" error is permanently fixed for image generation.
+- Same pattern can be applied to any other long-running AI operation if needed.
+- Works in dev mode and on a VPS (long-running process). For serverless (Vercel), the in-memory Map would need to be replaced with a persistent store (Redis/DB), but the user plans to deploy on a VPS.

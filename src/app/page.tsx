@@ -417,8 +417,9 @@ export default function Home() {
   };
 
   /**
-   * Generate the relevant image in the background, separately from comments.
-   * Updates the current result + history entry when the image is ready.
+   * Generate the relevant image in the background using a job-based polling
+   * approach. The POST starts the job and returns immediately (no timeout),
+   * then we poll GET every 3s until the image is ready.
    */
   const generateImageInBackground = async (
     imagePrompt: string,
@@ -427,38 +428,71 @@ export default function Home() {
   ) => {
     setImageLoading(true);
     try {
-      const res = await fetch('/api/generate-image', {
+      // 1. Start the job (fast — returns jobId immediately)
+      const startRes = await fetch('/api/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: imagePrompt, apiKey }),
       });
-      const data = await res.json();
-      if (data.success && data.dataUrl) {
-        // Update the current result with the image
-        setResult((prev) =>
-          prev ? { ...prev, imageDataUrl: data.dataUrl, imageError: undefined } : prev
-        );
-        // Update the history entry too
-        setHistory((prevHistory) => {
-          const updated = prevHistory.map((h) =>
-            h.id === historyEntryId ? { ...h, imageDataUrl: data.dataUrl } : h
-          );
-          try {
-            localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
-          } catch {
-            // ignore
-          }
-          return updated;
-        });
-        toast({ title: t('results.image') + ' ✓' });
-      } else {
-        const errMsg = data.error || 'unknown';
+      const startData = await startRes.json();
+      if (!startData.success || !startData.jobId) {
+        const errMsg = startData.error || 'unknown';
         setResult((prev) => (prev ? { ...prev, imageError: errMsg } : prev));
         toast({
           title: t('results.imageError'),
           description: errMsg,
           variant: 'destructive',
         });
+        return;
+      }
+      const jobId = startData.jobId as string;
+
+      // 2. Poll for status until done or error (each poll is a fast GET)
+      const POLL_INTERVAL_MS = 3000;
+      const MAX_POLL_DURATION_MS = 180000; // 3 minutes max
+      const startTime = Date.now();
+
+      while (true) {
+        if (Date.now() - startTime > MAX_POLL_DURATION_MS) {
+          throw new Error('Image generation timed out (3 min).');
+        }
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+
+        const pollRes = await fetch(`/api/generate-image?jobId=${encodeURIComponent(jobId)}`);
+        // If the poll response is not JSON (e.g. an HTML error page), bail gracefully
+        const contentType = pollRes.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          throw new Error('Server returned a non-JSON response during polling.');
+        }
+        const pollData = await pollRes.json();
+
+        if (!pollData.success) {
+          throw new Error(pollData.error || 'Polling failed.');
+        }
+
+        if (pollData.status === 'done' && pollData.dataUrl) {
+          setResult((prev) =>
+            prev ? { ...prev, imageDataUrl: pollData.dataUrl, imageError: undefined } : prev
+          );
+          setHistory((prevHistory) => {
+            const updated = prevHistory.map((h) =>
+              h.id === historyEntryId ? { ...h, imageDataUrl: pollData.dataUrl } : h
+            );
+            try {
+              localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+            } catch {
+              // ignore
+            }
+            return updated;
+          });
+          toast({ title: t('results.image') + ' ✓' });
+          return;
+        }
+
+        if (pollData.status === 'error') {
+          throw new Error(pollData.error || 'Image generation failed.');
+        }
+        // else status === 'pending' → keep polling
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : t('toast.networkError');
