@@ -3,17 +3,17 @@ import ZAI from 'z-ai-web-dev-sdk';
 /**
  * AI Client Helper
  *
- * Creates ZAI SDK instances from multiple sources (in priority order):
+ * The z-ai-web-dev-sdk's static `create()` method ALWAYS reads a config file
+ * from disk (cwd / home / /etc). It ignores any argument passed to it. This
+ * makes it impossible to use on Vercel/serverless where no config file exists.
+ *
+ * Solution: bypass `create()` and call the ZAI constructor directly with a
+ * config object. The constructor does NOT touch the filesystem.
+ *
+ * Resolution order for the API key:
  * 1. Explicit apiKey passed in code (e.g. user's personal key from the UI)
  * 2. ZAI_API_KEY environment variable (set on Vercel/server)
- * 3. Default ZAI.create() — reads from /etc/.z-ai-config (sandbox only)
- *
- * This is what makes the app work both in the sandbox AND on a real
- * deployment (Vercel, VPS, etc.) without code changes.
- *
- * The ZAI SDK's create() accepts a config object shaped like:
- *   { baseUrl: string, apiKey: string, chatId?, userId?, token? }
- * On z-ai the public API base URL is https://api.z.ai/v1
+ * 3. ZAI.create() — reads /etc/.z-ai-config (sandbox only)
  */
 
 export type ZaiInstance = Awaited<ReturnType<typeof ZAI.create>>;
@@ -49,9 +49,11 @@ function resolveApiKey(explicit?: string): string | undefined {
 
 /**
  * Get a ZAI SDK instance.
- * - If an API key is available (explicit or env), create the instance with it
- *   using the public z-ai API base URL.
- * - Otherwise, fall back to the default ZAI.create() which reads the config file
+ *
+ * - If an API key is available (explicit or env), construct the instance
+ *   directly via `new ZAI(config)` — this bypasses the config-file loading
+ *   that `ZAI.create()` does, so it works on Vercel/serverless.
+ * - Otherwise, fall back to `ZAI.create()` which reads the config file
  *   (works in the sandbox where /etc/.z-ai-config exists).
  */
 export async function getZaiInstance(explicitApiKey?: string): Promise<ZaiInstance> {
@@ -66,20 +68,14 @@ export async function getZaiInstance(explicitApiKey?: string): Promise<ZaiInstan
   let instance: ZaiInstance;
 
   if (resolved) {
-    // Build a config object with the public base URL + the user's API key.
+    // Build the config and use the constructor directly (no filesystem access).
     const config: ZaiConfig = {
       baseUrl: ZAI_PUBLIC_BASE_URL,
       apiKey: resolved,
     };
-    try {
-      instance = await (ZAI as unknown as {
-        create: (opts: ZaiConfig) => Promise<ZaiInstance>;
-      }).create(config);
-    } catch {
-      // If the SDK rejects the explicit config, fall back to default.
-      // This will likely fail on Vercel (no config file), but at least we tried.
-      instance = await ZAI.create();
-    }
+    // The ZAI class constructor accepts a config object and stores it.
+    // We cast because the type defs only expose `create()`.
+    instance = new (ZAI as unknown as new (config: ZaiConfig) => ZaiInstance)(config);
   } else {
     // Sandbox path — uses /etc/.z-ai-config automatically.
     instance = await ZAI.create();
