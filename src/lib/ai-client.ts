@@ -19,7 +19,8 @@ import ZAI from 'z-ai-web-dev-sdk';
 export type ZaiInstance = Awaited<ReturnType<typeof ZAI.create>>;
 
 // The public z-ai API base URL (used when a personal API key is provided).
-const ZAI_PUBLIC_BASE_URL = 'https://api.z.ai/v1';
+// Verified working: https://api.z.ai/api/paas/v4/chat/completions → 401 (auth required)
+const ZAI_PUBLIC_BASE_URL = 'https://api.z.ai/api/paas/v4';
 
 // Cache instances per source-key so we don't re-create on every request.
 const instanceCache = new Map<string, ZaiInstance>();
