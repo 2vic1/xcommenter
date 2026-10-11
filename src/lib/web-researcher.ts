@@ -1,10 +1,14 @@
 import ZAI from 'z-ai-web-dev-sdk';
-import { getZaiInstance } from './ai-client';
+import { getAiInstance, type AiProvider } from './ai-client';
 
 /**
  * Web Researcher - uses z-ai web_search function to gather real-time info
  * about a topic (e.g. a crypto project mentioned in a tweet), so the LLM can
  * write INFORMED comments and viral posts instead of generic ones.
+ *
+ * NOTE: Web research is only supported with the z-ai provider.
+ * OpenRouter does not have a web search function — callers should check the
+ * provider before requesting research.
  */
 
 export interface ResearchResult {
@@ -15,8 +19,15 @@ export interface ResearchResult {
   error?: string;
 }
 
-// Reuse the shared AI client helper.
-const getZAI = getZaiInstance;
+interface ResearchOptions {
+  apiKey?: string;
+  provider?: AiProvider;
+  model?: string;
+}
+
+async function getAI(opts: ResearchOptions) {
+  return getAiInstance({ provider: opts.provider, apiKey: opts.apiKey, model: opts.model });
+}
 
 /**
  * Search the web for information about a topic, then summarize the findings.
@@ -24,7 +35,7 @@ const getZAI = getZaiInstance;
  */
 export async function researchTopic(
   topic: string,
-  apiKey?: string,
+  options?: { apiKey?: string; provider?: AiProvider; model?: string },
   numResults = 6
 ): Promise<ResearchResult> {
   const cleanedTopic = topic.trim();
@@ -39,7 +50,7 @@ export async function researchTopic(
   }
 
   try {
-    const zai = await getZAI(apiKey);
+    const zai = await getAI(options || {});
 
     // 1. Search the web
     const searchResponse = await zai.functions.invoke('web_search', {

@@ -1,6 +1,6 @@
 import ZAI from 'z-ai-web-dev-sdk';
 import { getRules } from './rules-cache';
-import { getZaiInstance } from './ai-client';
+import { getAiInstance, type AiInstance, type AiProvider } from './ai-client';
 
 /**
  * Comment Generator - uses the LLM to suggest relevant English comments
@@ -32,6 +32,8 @@ export interface CommentOptions {
   count: number;
   apiKey?: string; // optional personal API key
   research?: string; // optional web research summary to inject into the prompt
+  provider?: AiProvider; // 'zai' (default) or 'openrouter'
+  model?: string; // model name (required for openrouter, optional for zai)
 }
 
 export interface CommentSuggestion {
@@ -66,8 +68,10 @@ export interface ViralGenerateResult {
   raw?: string;
 }
 
-// Reuse the shared AI client helper (handles env var, user key, and config file fallback).
-const getZAI = getZaiInstance;
+// Resolve an AI instance based on provider/model/apiKey in options.
+async function getAI(options: { provider?: AiProvider; apiKey?: string; model?: string }): Promise<AiInstance> {
+  return getAiInstance({ provider: options.provider, apiKey: options.apiKey, model: options.model });
+}
 
 const TONE_LABELS: Record<Tone, string> = {
   friendly: 'صمیمی و دوستانه',
@@ -128,7 +132,7 @@ export async function generateComments(
   options: CommentOptions
 ): Promise<GenerateResult> {
   const { xRules, userPreferences } = await getRules();
-  const zai = await getZAI(options.apiKey);
+  const zai = await getAI(options);
 
   const systemPrompt = buildSystemPrompt(xRules, userPreferences, options);
   const userPrompt = buildUserPrompt(tweetContent, options);
@@ -337,6 +341,8 @@ export interface ViralOptions {
   count: number;
   apiKey?: string;
   research?: string; // web research summary
+  provider?: AiProvider;
+  model?: string;
 }
 
 const HOOK_LABELS_PERSIAN: Record<string, string> = {
@@ -497,7 +503,7 @@ export async function generateViralPosts(
   options: ViralOptions
 ): Promise<ViralGenerateResult> {
   const { xRules, userPreferences } = await getRules();
-  const zai = await getZAI(options.apiKey);
+  const zai = await getAI(options);
 
   const systemPrompt = buildViralSystemPrompt(xRules, userPreferences, options);
   const userPrompt = buildViralUserPrompt(options);

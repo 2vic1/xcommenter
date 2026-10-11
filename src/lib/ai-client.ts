@@ -1,33 +1,57 @@
 import ZAI from 'z-ai-web-dev-sdk';
+import { createOpenRouterClient, type OpenRouterClient } from './openrouter-client';
 
 /**
- * AI Client Helper
+ * AI Client Helper — Multi-Provider
  *
- * Creates ZAI SDK instances from multiple sources (in priority order):
- * 1. Explicit apiKey passed in code (e.g. user's personal key from the UI)
- * 2. ZAI_API_KEY environment variable (set on Vercel/server)
- * 3. Default ZAI.create() — reads from /etc/.z-ai-config (sandbox only)
+ * Supports two providers:
+ * 1. z-ai (default) — glm models, web search, image generation, page reader
+ * 2. OpenRouter — ANY model (free or paid), OpenAI-compatible API
  *
- * The ZAI SDK's static `create()` method reads a config file from disk
- * (cwd / home / /etc). On Vercel/serverless where no config file exists,
- * we bypass `create()` and call the ZAI constructor directly with a config
- * object — the constructor does NOT touch the filesystem.
+ * The user picks a provider in the UI (or via env vars). The rest of the
+ * codebase calls getAiInstance() and gets back an object with the same shape
+ * (chat.completions.create, images.generations.create, functions.invoke)
+ * regardless of provider.
+ *
+ * Resolution order for provider:
+ * 1. Explicit provider passed in code
+ * 2. AI_PROVIDER env var ('zai' | 'openrouter')
+ * 3. Default: 'zai'
  */
+
+export type AiProvider = 'zai' | 'openrouter';
+
+// A unified type that both ZAI and OpenRouterClient satisfy.
+export interface AiInstance {
+  chat: {
+    completions: {
+      create: (body: Record<string, unknown>) => Promise<unknown>;
+    };
+  };
+  images: {
+    generations: {
+      create: (body: Record<string, unknown>) => Promise<unknown>;
+    };
+  };
+  functions: {
+    invoke: (name: string, args?: Record<string, unknown>) => Promise<unknown>;
+  };
+}
 
 export type ZaiInstance = Awaited<ReturnType<typeof ZAI.create>>;
 
-// The public z-ai API base URL (used when a personal API key is provided).
-// Verified working with a real API key: returns proper {choices:[...]} responses.
+// The public z-ai API base URL.
 const ZAI_PUBLIC_BASE_URL = 'https://api.z.ai/api/paas/v4';
 
-// Default models for the public z-ai API (verified working with a free-tier key).
-// Chat: glm-4.5-flash is free and works. Override with ZAI_CHAT_MODEL env var.
-// Image: cogview-3 for image generation. Override with ZAI_IMAGE_MODEL env var.
-const DEFAULT_CHAT_MODEL = process.env.ZAI_CHAT_MODEL || 'glm-4.5-flash';
-const DEFAULT_IMAGE_MODEL = process.env.ZAI_IMAGE_MODEL || 'cogview-3';
+// Default models for the public z-ai API.
+const DEFAULT_ZAI_CHAT_MODEL = process.env.ZAI_CHAT_MODEL || 'glm-4.5-flash';
+const DEFAULT_ZAI_IMAGE_MODEL = process.env.ZAI_IMAGE_MODEL || 'cogview-3';
 
-// Cache instances per source-key so we don't re-create on every request.
-const instanceCache = new Map<string, ZaiInstance>();
+// Default OpenRouter model (free, fast, good quality).
+const DEFAULT_OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.2-3b-instruct:free';
+
+// Cache instances per source-key.
+const instanceCache = new Map<string, AiInstance>();
 
 interface ZaiConfig {
   baseUrl: string;
@@ -37,91 +61,117 @@ interface ZaiConfig {
   token?: string;
 }
 
+export interface AiClientOptions {
+  provider?: AiProvider;
+  apiKey?: string;
+  model?: string;
+}
+
+/**
+ * Resolve the provider from options or env.
+ */
+function resolveProvider(explicit?: AiProvider): AiProvider {
+  if (explicit === 'zai' || explicit === 'openrouter') {
+    return explicit;
+  }
+  const envProvider = process.env.AI_PROVIDER as AiProvider | undefined;
+  if (envProvider === 'zai' || envProvider === 'openrouter') {
+    return envProvider;
+  }
+  return 'zai';
+}
+
 /**
  * Resolve an API key from the available sources.
- * Priority: explicit > ZAI_API_KEY env > undefined (let SDK use config file).
  */
-function resolveApiKey(explicit?: string): string | undefined {
+function resolveApiKey(provider: AiProvider, explicit?: string): string | undefined {
   if (explicit && explicit.trim().length > 0) {
     return explicit.trim();
   }
-  const envKey = process.env.ZAI_API_KEY;
-  if (envKey && envKey.trim().length > 0) {
-    return envKey.trim();
+  if (provider === 'openrouter') {
+    const envKey = process.env.OPENROUTER_API_KEY;
+    if (envKey && envKey.trim().length > 0) return envKey.trim();
+  } else {
+    const envKey = process.env.ZAI_API_KEY;
+    if (envKey && envKey.trim().length > 0) return envKey.trim();
   }
   return undefined;
 }
 
 /**
- * Wrap a raw ZAI instance so that every chat.completions.create and
- * images.generations.create call automatically gets a default `model` field
- * if the caller didn't provide one. This is needed for the public z-ai API
- * (the API requires a model field, otherwise it returns a 500 error).
- *
- * Only applied when using the PUBLIC API. The sandbox's internal API doesn't
- * need (and shouldn't get) an explicit model.
+ * Resolve a model name for OpenRouter.
  */
-function wrapInstance(raw: ZaiInstance): ZaiInstance {
+function resolveOpenRouterModel(explicit?: string): string {
+  if (explicit && explicit.trim().length > 0) return explicit.trim();
+  return DEFAULT_OPENROUTER_MODEL;
+}
+
+/**
+ * Wrap a raw ZAI instance so that every chat.completions.create and
+ * images.generations.create call gets a default model (the public z-ai API
+ * requires a model field). Only applied for the public API path.
+ */
+function wrapZaiInstance(raw: ZaiInstance): AiInstance {
   const chatCreate = raw.chat.completions.create.bind(raw.chat.completions);
   const imageCreate = raw.images.generations.create.bind(raw.images.generations);
 
   (raw.chat.completions as { create: unknown }).create = (body: Record<string, unknown>) => {
-    if (!body.model) {
-      body.model = DEFAULT_CHAT_MODEL;
-    }
+    if (!body.model) body.model = DEFAULT_ZAI_CHAT_MODEL;
     return chatCreate(body);
   };
-
   (raw.images.generations as { create: unknown }).create = (body: Record<string, unknown>) => {
-    if (!body.model) {
-      body.model = DEFAULT_IMAGE_MODEL;
-    }
+    if (!body.model) body.model = DEFAULT_ZAI_IMAGE_MODEL;
     return imageCreate(body);
   };
 
-  return raw;
+  return raw as unknown as AiInstance;
 }
 
 /**
- * Get a ZAI SDK instance.
+ * Get an AI instance for the chosen provider.
  *
- * - If an API key is available (explicit or env), construct the instance
- *   directly via `new ZAI(config)` — this bypasses the config-file loading
- *   that `ZAI.create()` does, so it works on Vercel/serverless.
- *   The instance is wrapped to inject a default model into every API call
- *   (the public API requires a model field).
- * - Otherwise, fall back to `ZAI.create()` which reads the config file
- *   (works in the sandbox where /etc/.z-ai-config exists).
- *   No wrapping — the internal API doesn't need a model field.
+ * Provider: zai (default)
+ * - With API key: use `new ZAI(config)` + model injection wrapper
+ * - Without API key: use `ZAI.create()` (reads /etc/.z-ai-config — sandbox only)
+ *
+ * Provider: openrouter
+ * - Requires API key (from options or OPENROUTER_API_KEY env)
+ * - Uses OpenRouterClient which mimics the ZAI interface
+ * - Image generation and web research are NOT supported (will throw clear errors)
  */
-export async function getZaiInstance(explicitApiKey?: string): Promise<ZaiInstance> {
-  const resolved = resolveApiKey(explicitApiKey);
-  const cacheKey = resolved || '__default_config__';
+export async function getAiInstance(options: AiClientOptions = {}): Promise<AiInstance> {
+  const provider = resolveProvider(options.provider);
+  const apiKey = resolveApiKey(provider, options.apiKey);
+  const cacheKey = `${provider}:${apiKey || '__no_key__'}:${options.model || ''}`;
 
   const cached = instanceCache.get(cacheKey);
-  if (cached) {
-    return cached;
-  }
+  if (cached) return cached;
 
-  let instance: ZaiInstance;
-  let isPublicApi = false;
+  let instance: AiInstance;
 
-  if (resolved) {
-    // Build the config and use the constructor directly (no filesystem access).
-    const config: ZaiConfig = {
-      baseUrl: ZAI_PUBLIC_BASE_URL,
-      apiKey: resolved,
-    };
-    instance = new (ZAI as unknown as new (config: ZaiConfig) => ZaiInstance)(config);
-    isPublicApi = true;
+  if (provider === 'openrouter') {
+    if (!apiKey) {
+      throw new Error(
+        'OpenRouter API key is required. Set OPENROUTER_API_KEY env var or provide a key in the UI.'
+      );
+    }
+    const model = resolveOpenRouterModel(options.model);
+    const client = createOpenRouterClient({ apiKey, model });
+    instance = client as unknown as AiInstance;
   } else {
-    // Sandbox path — uses /etc/.z-ai-config automatically.
-    instance = await ZAI.create();
-  }
-
-  // Only inject the default model when using the PUBLIC API.
-  if (isPublicApi) {
-    instance = wrapInstance(instance);
+    // z-ai provider
+    if (apiKey) {
+      const config: ZaiConfig = {
+        baseUrl: ZAI_PUBLIC_BASE_URL,
+        apiKey,
+      };
+      const raw = new (ZAI as unknown as new (config: ZaiConfig) => ZaiInstance)(config);
+      instance = wrapZaiInstance(raw);
+    } else {
+      // Sandbox path — uses /etc/.z-ai-config automatically.
+      const raw = await ZAI.create();
+      instance = raw as unknown as AiInstance;
+    }
   }
 
   instanceCache.set(cacheKey, instance);
@@ -131,6 +181,11 @@ export async function getZaiInstance(explicitApiKey?: string): Promise<ZaiInstan
 /**
  * Clear the instance cache (useful if the user changes their API key).
  */
-export function clearZaiCache(): void {
+export function clearAiCache(): void {
   instanceCache.clear();
+}
+
+// Backward-compat alias for existing callers that use getZaiInstance.
+export async function getZaiInstance(apiKey?: string): Promise<AiInstance> {
+  return getAiInstance({ provider: 'zai', apiKey });
 }

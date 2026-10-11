@@ -1,10 +1,14 @@
 import ZAI from 'z-ai-web-dev-sdk';
-import { getZaiInstance } from './ai-client';
+import { getAiInstance, type AiProvider } from './ai-client';
 
 /**
  * Image Generator - uses z-ai-web-dev-sdk images.generations.create
  * to generate a relevant image from a prompt.
  * Returns a base64 data URL that the frontend can display directly.
+ *
+ * NOTE: Image generation is only supported with the z-ai provider.
+ * OpenRouter does not have image generation — callers should check the
+ * provider before requesting an image.
  */
 
 export interface ImageResult {
@@ -14,16 +18,25 @@ export interface ImageResult {
   error?: string;
 }
 
-// Reuse the shared AI client helper.
-const getZAI = getZaiInstance;
+interface ImageOptions {
+  apiKey?: string;
+  provider?: AiProvider;
+  model?: string;
+}
+
+async function getAI(opts: ImageOptions) {
+  return getAiInstance({ provider: opts.provider, apiKey: opts.apiKey, model: opts.model });
+}
 
 /**
  * Generate an image from a prompt and return it as a base64 data URL.
  * Size defaults to 1024x1024 (square, ideal for social replies).
+ *
+ * Only works with the z-ai provider. OpenRouter will return an error.
  */
 export async function generateImage(
   prompt: string,
-  apiKey?: string,
+  options?: { apiKey?: string; provider?: AiProvider; model?: string },
   size: string = '1024x1024'
 ): Promise<ImageResult> {
   if (!prompt || prompt.trim().length < 3) {
@@ -46,11 +59,11 @@ export async function generateImage(
   const safeSize = allowedSizes.includes(size) ? size : '1024x1024';
 
   try {
-    const zai = await getZAI(apiKey);
-    const response = await zai.images.generations.create({
+    const zai = await getAI(options || {});
+    const response = (await zai.images.generations.create({
       prompt: prompt.trim(),
       size: safeSize as '1024x1024',
-    });
+    })) as { data?: Array<{ base64?: string }> };
 
     const base64 = response.data?.[0]?.base64;
     if (!base64) {

@@ -426,10 +426,14 @@ export default function Home() {
   } | null>(null);
   const [viralImageLoading, setViralImageLoading] = React.useState(false);
 
-  // API key settings
-  const [apiSource, setApiSource] = React.useState<'site' | 'personal'>('site');
+  // API key settings (supports z-ai and OpenRouter)
+  const [apiSource, setApiSource] = React.useState<'site' | 'personal' | 'openrouter'>('site');
   const [apiKeyInput, setApiKeyInput] = React.useState('');
   const [savedApiKey, setSavedApiKey] = React.useState('');
+  // OpenRouter-specific state
+  const [openrouterKeyInput, setOpenrouterKeyInput] = React.useState('');
+  const [savedOpenrouterKey, setSavedOpenrouterKey] = React.useState('');
+  const [openrouterModel, setOpenrouterModel] = React.useState('meta-llama/llama-3.2-3b-instruct');
 
   // Generation state
   const [generating, setGenerating] = React.useState(false);
@@ -488,7 +492,7 @@ export default function Home() {
     [t]
   );
 
-  // Load history, rules, and saved API key on mount
+  // Load history, rules, and saved API keys on mount
   React.useEffect(() => {
     try {
       const stored = localStorage.getItem(HISTORY_KEY);
@@ -500,6 +504,15 @@ export default function Home() {
         setSavedApiKey(savedKey.trim());
         setApiSource('personal');
         setApiKeyInput(savedKey.trim());
+      }
+      const savedOrKey = localStorage.getItem('commentyar-openrouter-key');
+      if (savedOrKey && savedOrKey.trim().length > 0) {
+        setSavedOpenrouterKey(savedOrKey.trim());
+        setOpenrouterKeyInput(savedOrKey.trim());
+      }
+      const savedOrModel = localStorage.getItem('commentyar-openrouter-model');
+      if (savedOrModel && savedOrModel.trim().length > 0) {
+        setOpenrouterModel(savedOrModel.trim());
       }
     } catch {
       // ignore
@@ -546,7 +559,43 @@ export default function Home() {
     toast({ title: t('settings.apiKeyCleared') });
   };
 
-  const effectiveApiKey = apiSource === 'personal' && savedApiKey ? savedApiKey : undefined;
+  // OpenRouter key handlers
+  const handleSaveOpenrouterKey = () => {
+    const trimmed = openrouterKeyInput.trim();
+    if (!trimmed) {
+      toast({ title: t('toast.urlRequired'), description: t('settings.openrouterKeyPlaceholder'), variant: 'destructive' });
+      return;
+    }
+    try {
+      localStorage.setItem('commentyar-openrouter-key', trimmed);
+      localStorage.setItem('commentyar-openrouter-model', openrouterModel.trim());
+      setSavedOpenrouterKey(trimmed);
+      setApiSource('openrouter');
+      toast({ title: t('settings.openrouterKeySaved') });
+    } catch {
+      toast({ title: t('toast.networkError'), variant: 'destructive' });
+    }
+  };
+
+  const handleClearOpenrouterKey = () => {
+    try {
+      localStorage.removeItem('commentyar-openrouter-key');
+    } catch {
+      // ignore
+    }
+    setSavedOpenrouterKey('');
+    setOpenrouterKeyInput('');
+    setApiSource('site');
+    toast({ title: t('settings.openrouterKeyCleared') });
+  };
+
+  // Effective provider + key + model (used by API calls)
+  const effectiveProvider = apiSource === 'openrouter' ? 'openrouter' as const : 'zai' as const;
+  const effectiveApiKey =
+    apiSource === 'personal' && savedApiKey ? savedApiKey
+    : apiSource === 'openrouter' && savedOpenrouterKey ? savedOpenrouterKey
+    : undefined;
+  const effectiveModel = apiSource === 'openrouter' ? openrouterModel : undefined;
 
   const persistHistory = React.useCallback((entries: HistoryEntry[]) => {
     setHistory(entries);
@@ -657,7 +706,7 @@ export default function Home() {
         const rres = await fetch('/api/research', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topic: effectiveContent.slice(0, 400), apiKey: effectiveApiKey }),
+          body: JSON.stringify({ topic: effectiveContent.slice(0, 400), apiKey: effectiveApiKey, provider: effectiveProvider, model: effectiveModel }),
         });
         const rdata = await rres.json();
         if (rdata.success && rdata.summary) {
@@ -699,6 +748,8 @@ export default function Home() {
           count,
           apiKey: effectiveApiKey,
           research: researchContext,
+          provider: effectiveProvider,
+          model: effectiveModel,
         }),
       });
       const data = await res.json();
@@ -737,7 +788,7 @@ export default function Home() {
 
       // Generate the image SEPARATELY in the background (avoids the long
       // single-request timeout that was causing HTML error pages instead of JSON).
-      if (generateImageEnabled && generated.imagePrompt && generated.imagePrompt.trim().length > 3) {
+      if (generateImageEnabled && generated.imagePrompt && generated.imagePrompt.trim().length > 3 && effectiveProvider !== 'openrouter') {
         generateImageInBackground(generated.imagePrompt, effectiveApiKey, entry.id);
       }
     } catch (err) {
@@ -765,7 +816,7 @@ export default function Home() {
       const startRes = await fetch('/api/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: imagePrompt, apiKey }),
+        body: JSON.stringify({ prompt: imagePrompt, apiKey, provider: effectiveProvider, model: effectiveModel }),
       });
       const startData = await startRes.json();
       if (!startData.success || !startData.jobId) {
@@ -858,7 +909,7 @@ export default function Home() {
         const rres = await fetch('/api/research', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topic: topic.slice(0, 400), apiKey: effectiveApiKey }),
+          body: JSON.stringify({ topic: topic.slice(0, 400), apiKey: effectiveApiKey, provider: effectiveProvider, model: effectiveModel }),
         });
         const rdata = await rres.json();
         if (rdata.success && rdata.summary) {
@@ -896,6 +947,8 @@ export default function Home() {
           count: viralCount,
           apiKey: effectiveApiKey,
           research: researchContext,
+          provider: effectiveProvider,
+          model: effectiveModel,
         }),
       });
       const data = await res.json();
@@ -920,7 +973,9 @@ export default function Home() {
 
       // Generate image in background if enabled
       if (generateImageEnabled && generated.imagePrompt && generated.imagePrompt.trim().length > 3) {
-        generateViralImageInBackground(generated.imagePrompt, effectiveApiKey);
+        if (effectiveProvider !== 'openrouter') {
+          generateViralImageInBackground(generated.imagePrompt, effectiveApiKey);
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : t('toast.networkError');
@@ -940,7 +995,7 @@ export default function Home() {
       const startRes = await fetch('/api/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: imagePrompt, apiKey }),
+        body: JSON.stringify({ prompt: imagePrompt, apiKey, provider: effectiveProvider, model: effectiveModel }),
       });
       const startData = await startRes.json();
       if (!startData.success || !startData.jobId) {
@@ -1397,7 +1452,7 @@ export default function Home() {
                 <div className="space-y-3">
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold">{t('settings.apiSource')}</Label>
-                    <Select value={apiSource} onValueChange={(v) => setApiSource(v as 'site' | 'personal')}>
+                    <Select value={apiSource} onValueChange={(v) => setApiSource(v as 'site' | 'personal' | 'openrouter')}>
                       <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
@@ -1409,6 +1464,10 @@ export default function Home() {
                         <SelectItem value="personal">
                           <span className="font-medium">{t('settings.apiSource.personal')}</span>
                           <span className="text-muted-foreground"> — {t('settings.apiSource.personalHint')}</span>
+                        </SelectItem>
+                        <SelectItem value="openrouter">
+                          <span className="font-medium">{t('settings.apiSource.openrouter')}</span>
+                          <span className="text-muted-foreground"> — {t('settings.apiSource.openrouterHint')}</span>
                         </SelectItem>
                       </SelectContent>
                     </Select>
@@ -1439,6 +1498,51 @@ export default function Home() {
                       {savedApiKey && (
                         <p className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
                           ✓ {t('settings.apiKeySaved')}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {apiSource === 'openrouter' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="openrouter-key-input" className="text-xs font-semibold">{t('settings.openrouterKeyLabel')}</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="openrouter-key-input"
+                          type="password"
+                          dir="ltr"
+                          placeholder={t('settings.openrouterKeyPlaceholder')}
+                          value={openrouterKeyInput}
+                          onChange={(e) => setOpenrouterKeyInput(e.target.value)}
+                          className="ltr text-left font-mono text-xs"
+                        />
+                        <Button size="sm" variant="default" className="shrink-0" onClick={handleSaveOpenrouterKey}>
+                          {t('settings.apiKeySave')}
+                        </Button>
+                        {savedOpenrouterKey && (
+                          <Button size="sm" variant="outline" className="shrink-0" onClick={handleClearOpenrouterKey}>
+                            {t('settings.apiKeyClear')}
+                          </Button>
+                        )}
+                      </div>
+                      <Label htmlFor="openrouter-model-input" className="text-xs font-semibold">{t('settings.openrouterModel')}</Label>
+                      <Input
+                        id="openrouter-model-input"
+                        dir="ltr"
+                        placeholder={t('settings.openrouterModelPlaceholder')}
+                        value={openrouterModel}
+                        onChange={(e) => setOpenrouterModel(e.target.value)}
+                        className="ltr text-left font-mono text-xs"
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        {t('settings.openrouterModelHint')}
+                      </p>
+                      <div className="flex items-center gap-2 rounded-md bg-amber-50 p-2 text-[11px] text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+                        <AlertCircle className="h-3 w-3 shrink-0" />
+                        <span>{t('settings.openrouterNoImage')}</span>
+                      </div>
+                      {savedOpenrouterKey && (
+                        <p className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                          ✓ {t('settings.openrouterKeySaved')}
                         </p>
                       )}
                     </div>

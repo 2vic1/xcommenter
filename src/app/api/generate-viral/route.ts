@@ -24,6 +24,8 @@ export async function POST(request: NextRequest) {
       count = 5,
       apiKey,
       research,
+      provider,
+      model,
     } = body as {
       topic?: string;
       tone?: string;
@@ -33,6 +35,8 @@ export async function POST(request: NextRequest) {
       count?: number;
       apiKey?: string;
       research?: string;
+      provider?: string;
+      model?: string;
     };
 
     if (!topic || typeof topic !== 'string' || topic.trim().length < 3) {
@@ -67,6 +71,8 @@ export async function POST(request: NextRequest) {
       count: safeCount,
       apiKey: safeApiKey,
       research: safeResearch,
+      provider: provider === 'openrouter' ? 'openrouter' : 'zai',
+      model: typeof model === 'string' && model.trim().length > 0 ? model.trim() : undefined,
     };
 
     const result = await generateViralPosts(topic.trim(), options);

@@ -37,6 +37,8 @@ export async function POST(request: NextRequest) {
       count = 5,
       apiKey,
       research,
+      provider,
+      model,
     } = body as {
       tweetContent?: string;
       tone?: string;
@@ -49,6 +51,8 @@ export async function POST(request: NextRequest) {
       count?: number;
       apiKey?: string;
       research?: string;
+      provider?: string;
+      model?: string;
     };
 
     if (!tweetContent || typeof tweetContent !== 'string' || tweetContent.trim().length < 3) {
@@ -89,6 +93,8 @@ export async function POST(request: NextRequest) {
       apiKey: safeApiKey,
       research:
         typeof research === 'string' && research.trim().length > 10 ? research.trim() : undefined,
+      provider: provider === 'openrouter' ? 'openrouter' : 'zai',
+      model: typeof model === 'string' && model.trim().length > 0 ? model.trim() : undefined,
     };
 
     const result = await generateComments(tweetContent.trim(), options);

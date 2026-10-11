@@ -54,7 +54,12 @@ function genId(): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
-    const { prompt, apiKey } = body as { prompt?: string; apiKey?: string };
+    const { prompt, apiKey, provider, model } = body as {
+      prompt?: string;
+      apiKey?: string;
+      provider?: string;
+      model?: string;
+    };
 
     if (!prompt || typeof prompt !== 'string' || prompt.trim().length < 3) {
       return NextResponse.json(
@@ -63,8 +68,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (provider === 'openrouter') {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'تولید تصویر فقط با کلید z-ai کار می‌کند. لطفاً z-ai را انتخاب کنید یا تیک تصویر را خاموش کنید.',
+        },
+        { status: 400 }
+      );
+    }
+
     const safeApiKey =
       typeof apiKey === 'string' && apiKey.trim().length > 0 ? apiKey.trim() : undefined;
+    const safeModel =
+      typeof model === 'string' && model.trim().length > 0 ? model.trim() : undefined;
 
     const jobId = genId();
     const job: ImageJob = {
@@ -79,7 +97,7 @@ export async function POST(request: NextRequest) {
     // The process stays alive in dev mode / VPS, so this works.
     (async () => {
       try {
-        const result = await generateImage(prompt.trim(), safeApiKey);
+        const result = await generateImage(prompt.trim(), { apiKey: safeApiKey, provider: 'zai', model: safeModel });
         const current = jobs.get(jobId);
         if (!current) return; // job was cleaned up
         if (result.success && result.dataUrl) {
